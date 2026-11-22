@@ -45,6 +45,10 @@ import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.dateiname
 import de.vereinskasse.logik.konfigExport
 import de.vereinskasse.logik.neueId
+import de.vereinskasse.logik.datumZeit
+import de.vereinskasse.logik.jetzt
+import de.vereinskasse.logik.sicherungExport
+import de.vereinskasse.logik.sicherungsDateiname
 import de.vereinskasse.model.Verein
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,7 +129,8 @@ fun VereineSeite(
                 Abschnitt("So funktioniert Teilen per WhatsApp") {
                     Text(
                         "• Exportieren: Beim Verein auf „Teilen“ tippen und WhatsApp wählen. " +
-                            "Es wird eine Datei mit allen Gruppen und Artikeln (ohne Umsätze) verschickt.\n" +
+                            "Es wird eine Datei mit Gruppen, Artikeln und Veranstaltungen (ohne Umsätze) verschickt – " +
+                            "so haben alle Kassen dieselbe Veranstaltung.\n" +
                             "• Importieren: Die Datei in WhatsApp antippen und mit „Vereinskasse“ öffnen – " +
                             "oder die Datei speichern und hier auf „Importieren“ tippen.\n" +
                             "• Gibt es den Verein schon, fragt die App, ob ersetzt oder ergänzt werden soll.\n" +
@@ -134,6 +139,37 @@ fun VereineSeite(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            item {
+                Abschnitt("Datensicherung") {
+                    Text(
+                        "Sichert alles – Vereine, Artikel, Veranstaltungen, Bestellungen und Abschlüsse – in eine Datei. " +
+                            "Zum Wiederherstellen nach Handywechsel oder Neuinstallation die Datei mit der App öffnen " +
+                            "oder hier „Wiederherstellen“ wählen.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        daten.letzteSicherung?.let { "Letzte Sicherung erstellt: ${datumZeit(it)}" } ?: "Noch keine Sicherung erstellt.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(onClick = {
+                            val zeit = jetzt()
+                            store.aendern { it.copy(letzteSicherung = zeit) }
+                            plattform.teileDatei(sicherungsDateiname(zeit), store.daten.sicherungExport(zeit))
+                        }, modifier = Modifier.weight(1f)) {
+                            Text("Sicherung erstellen")
+                        }
+                        OutlinedButton(onClick = { plattform.dateiOeffnen() }, modifier = Modifier.weight(1f)) {
+                            Text("Wiederherstellen")
+                        }
+                    }
                 }
             }
             item {

@@ -10,6 +10,7 @@ import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.SpeicherImRam
 import de.vereinskasse.logik.artikelHinzufuegen
 import de.vereinskasse.logik.konfigExport
+import de.vereinskasse.logik.sicherungExport
 import de.vereinskasse.logik.pfandRueckgabeHinzufuegen
 import de.vereinskasse.model.*
 import de.vereinskasse.ui.App
@@ -226,6 +227,17 @@ class Bildschirmfotos {
             App(s, plattform, de.vereinskasse.logik.ImportDatei("TSV_Musterdorf_Artikel.csv", csv.encodeToByteArray()), {},
                 startSeiten = listOf(Seite.Kasse, Seite.VereinBearbeiten("ver1")))
         }
+    }
+
+    @Test
+    fun sicherung() {
+        val s = store()
+        val sicherung = s.daten.sicherungExport(1_781_373_600_000)
+        foto("17_wiederherstellen", 412, 892) {
+            App(s, plattform, de.vereinskasse.logik.ImportDatei("Sicherung.json", sicherung.encodeToByteArray()), {},
+                startSeiten = listOf(Seite.Kasse, Seite.Vereine))
+        }
+        foto("18_vereine_sicherung", 412, 1300) { App(s, plattform, null, {}, startSeiten = listOf(Seite.Kasse, Seite.Vereine)) }
     }
 
     @Test

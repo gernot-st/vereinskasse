@@ -29,8 +29,12 @@ Keine Rechnungen, kein Finanzamt, keine Cloud: Alle Daten bleiben auf dem Gerät
   Reihenfolge der Zeilen = Reihenfolge an der Kasse. Der Import erkennt Strichpunkt/Komma/Tab,
   UTF-8 und Windows-Kodierung, zeigt fehlerhafte Zeilen mit Zeilennummer und fragt: ergänzen oder ersetzen.
   Farben als Name (blau, rot, grün, orange, lila, türkis, gelb, braun, pink, grau, indigo, hellgrün) oder `#RRGGBB`.
-- **Konfiguration per WhatsApp** exportieren und importieren – beim Import wird gefragt:
-  ergänzen, ersetzen oder als neuen Verein anlegen
+- **Konfiguration per WhatsApp** exportieren und importieren – Gruppen, Artikel und Veranstaltungen
+  (ohne Umsätze). Beim Import wird gefragt: ergänzen, ersetzen oder als neuen Verein anlegen.
+  Vorhandene Veranstaltungen (gleicher Name) bleiben unangetastet, neue werden angelegt; die im
+  Absender aktive Veranstaltung wird auch beim Empfänger aktiv. So haben alle Kassen dieselbe Veranstaltung.
+- **Datensicherung** (in der Vereinsliste): alle Daten des Geräts inkl. Bestellungen in eine Datei;
+  Wiederherstellen ersetzt nach Rückfrage alle Daten (für Handywechsel oder Neuinstallation)
 
 ## App installieren
 

@@ -11,6 +11,8 @@ data class AppDaten(
     val geraetename: String = "Kasse 1",
     /** Eindeutige Kennung dieses Geräts (für Abschlüsse beim Zusammenführen). */
     val geraeteId: String = "",
+    /** Zeitpunkt der letzten erstellten Datensicherung. */
+    val letzteSicherung: Long? = null,
 )
 
 @Serializable
@@ -135,11 +137,15 @@ data class ExportDatei(
     val typ: String,
     val verein: VereinKonfig? = null,
     val abschluss: Abschluss? = null,
+    /** Nur bei Datensicherung: alle Daten des Geräts. */
+    val daten: AppDaten? = null,
+    val erstelltAm: Long? = null,
 ) {
     companion object {
         const val FORMAT = "vereinskasse"
         const val TYP_KONFIG = "konfiguration"
         const val TYP_ABSCHLUSS = "abschluss"
+        const val TYP_SICHERUNG = "sicherung"
     }
 }
 
@@ -150,4 +156,16 @@ data class VereinKonfig(
     val name: String,
     val gruppen: List<Gruppe>,
     val artikel: List<Artikel>,
+    /** Ab Version 1.4: Veranstaltungen ohne Umsätze. */
+    val veranstaltungen: List<VeranstaltungKonfig> = emptyList(),
+    val aktiveVeranstaltungId: String? = null,
+)
+
+/** Veranstaltung ohne Bestellungen (für die Konfiguration). */
+@Serializable
+data class VeranstaltungKonfig(
+    val id: String,
+    val name: String,
+    val erstelltAm: Long,
+    val anfangsbestandCent: Long = 0,
 )

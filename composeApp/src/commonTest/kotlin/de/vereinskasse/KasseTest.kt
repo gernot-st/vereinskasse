@@ -222,3 +222,74 @@ class VerlaufTest {
         assertNull(a.copy(enthaeltBestellungen = false).amTag(tag))
     }
 }
+
+class SicherungUndVeranstaltungTest {
+    private val bestellung = Bestellung("b1", 1000, listOf(Position(name = "Bier", menge = 2, einzelpreisCent = 350)))
+    private val quelle = Verein(
+        "v1", "TSV",
+        artikel = listOf(Artikel("a1", "Bier", 350)),
+        veranstaltungen = listOf(
+            Veranstaltung("e1", "Sommerfest 2026", 100, anfangsbestandCent = 15000, istBestandCent = 99, bestellungen = listOf(bestellung)),
+            Veranstaltung("e2", "Kirchweih", 200, anfangsbestandCent = 5000),
+        ),
+        aktiveVeranstaltungId = "e1",
+    )
+
+    @Test
+    fun konfigEnthaeltVeranstaltungenOhneUmsaetze() {
+        val text = quelle.konfigExport()
+        assertTrue("bestellungen" !in text && "istBestand" !in text)
+        val konfig = (importLesen(text) as ImportErgebnis.Konfig).konfig
+        assertEquals(2, konfig.veranstaltungen.size)
+
+        // Neues Gerät: Veranstaltungen leer angelegt, gleiche IDs, aktiv gesetzt
+        val neu = AppDaten().konfigImportieren(konfig, ImportArt.ERGAENZEN).vereine.single()
+        assertEquals(listOf("e1", "e2"), neu.veranstaltungen.map { it.id })
+        assertEquals(15000L, neu.veranstaltungen[0].anfangsbestandCent)
+        assertTrue(neu.veranstaltungen.all { it.bestellungen.isEmpty() })
+        assertEquals("e1", neu.aktiveVeranstaltungId)
+    }
+
+    @Test
+    fun vorhandeneVeranstaltungenBleibenUnangetastet() {
+        val lokal = Verein(
+            "v1", "TSV",
+            veranstaltungen = listOf(
+                Veranstaltung("x9", "sommerfest 2026", 5, anfangsbestandCent = 1, bestellungen = listOf(bestellung)),
+                Veranstaltung("x8", "Altes Fest", 1),
+            ),
+            aktiveVeranstaltungId = "x8",
+        )
+        val konfig = (importLesen(quelle.konfigExport()) as ImportErgebnis.Konfig).konfig
+        assertEquals(listOf("Kirchweih"), lokal.neueVeranstaltungen(konfig).map { it.name })
+        for (art in listOf(ImportArt.ERGAENZEN, ImportArt.ERSETZEN)) {
+            val v = AppDaten(vereine = listOf(lokal)).konfigImportieren(konfig, art).vereine.single()
+            assertEquals(listOf("sommerfest 2026", "Altes Fest", "Kirchweih"), v.veranstaltungen.map { it.name })
+            assertEquals(1L, v.veranstaltungen[0].anfangsbestandCent)
+            assertEquals(1, v.veranstaltungen[0].bestellungen.size)
+            // Aktive Veranstaltung der Datei (Sommerfest) wird auf die lokale gleichnamige gemappt
+            assertEquals("x9", v.aktiveVeranstaltungId)
+        }
+    }
+
+    @Test
+    fun alteKonfigOhneVeranstaltungen() {
+        val alt = """{"format":"vereinskasse","version":1,"typ":"konfiguration","verein":{"id":"v1","name":"TSV","gruppen":[],"artikel":[]}}"""
+        val konfig = (importLesen(alt) as ImportErgebnis.Konfig).konfig
+        val lokal = quelle.copy(aktiveVeranstaltungId = "e2")
+        val v = AppDaten(vereine = listOf(lokal)).konfigImportieren(konfig, ImportArt.ERGAENZEN).vereine.single()
+        assertEquals(2, v.veranstaltungen.size)
+        assertEquals("e2", v.aktiveVeranstaltungId)
+    }
+
+    @Test
+    fun sicherungRundreise() {
+        val daten = AppDaten(listOf(quelle), "v1", "Getränke-Kasse", "geraet1")
+        val text = daten.sicherungExport(1_781_373_600_000)
+        val ergebnis = importLesen(text) as ImportErgebnis.Sicherung
+        assertEquals(daten.copy(letzteSicherung = 1_781_373_600_000), ergebnis.daten)
+        assertEquals(1_781_373_600_000, ergebnis.erstelltAm)
+        assertEquals("1 Verein, 2 Veranstaltungen, 1 Bestellung", ergebnis.daten.umfangText())
+        assertTrue(sicherungsDateiname(1_781_373_600_000).startsWith("Vereinskasse_Sicherung_2026-06-1"))
+    }
+}

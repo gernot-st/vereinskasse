@@ -20,6 +20,13 @@ import de.vereinskasse.logik.ImportArt
 import de.vereinskasse.logik.ImportDatei
 import de.vereinskasse.logik.ImportErgebnis
 import de.vereinskasse.logik.textDekodieren
+import de.vereinskasse.logik.neueVeranstaltungen
+import de.vereinskasse.logik.umfangText
+import de.vereinskasse.logik.datumZeit
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Checkbox
+import androidx.compose.ui.Alignment
 import de.vereinskasse.logik.KassenStore
 import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.abschlussImportieren
@@ -78,6 +85,8 @@ fun App(
             val zielVerein = (stapel.last() as? Seite.VereinBearbeiten)?.vereinId ?: store.daten.aktiverVereinId
             ImportDialog(store, importDatei, zielVerein, importErledigt, nachKonfigImport = {
                 if (stapel.last() == Seite.Vereine && stapel.size == 1) zurKasse()
+            }, nachWiederherstellen = {
+                stapel = if (store.aktiverVerein == null) listOf(Seite.Vereine) else listOf(Seite.Kasse)
             })
         }
 
@@ -94,6 +103,7 @@ private fun ImportDialog(
     zielVereinId: String?,
     fertig: () -> Unit,
     nachKonfigImport: () -> Unit,
+    nachWiederherstellen: () -> Unit,
 ) {
     val text = remember(datei) { textDekodieren(datei.bytes) }
     val istJson = text.trimStart().startsWith("{") || datei.name?.endsWith(".json", ignoreCase = true) == true
@@ -108,13 +118,60 @@ private fun ImportDialog(
             fertig()
         }, importiert = nachKonfigImport)
         is ImportErgebnis.AbschlussDatei -> AbschlussImportDialog(store, ergebnis.abschluss, fertig)
+        is ImportErgebnis.Sicherung -> WiederherstellenDialog(store, ergebnis, fertig, nachWiederherstellen)
     }
+}
+
+@Composable
+private fun WiederherstellenDialog(
+    store: KassenStore,
+    sicherung: ImportErgebnis.Sicherung,
+    fertig: () -> Unit,
+    wiederhergestellt: () -> Unit,
+) {
+    var bestaetigt by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = fertig,
+        title = { Text("Datensicherung wiederherstellen?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Sicherung" + (sicherung.erstelltAm?.let { " vom ${datumZeit(it)}" } ?: "") + ":\n" +
+                        sicherung.daten.umfangText() + "."
+                )
+                Text(
+                    "Alle Daten auf diesem Gerät werden ersetzt:\n" + store.daten.umfangText() + " gehen dabei verloren.",
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Text(
+                    "Auch der Gerätename („${sicherung.daten.geraetename}“) wird übernommen. Die Sicherung ist für den Umzug " +
+                        "auf ein neues Handy oder eine Neuinstallation gedacht – nicht, um ein zweites Kassen-Handy einzurichten " +
+                        "(dafür „Für andere Handys teilen“).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { bestaetigt = !bestaetigt }) {
+                    Checkbox(checked = bestaetigt, onCheckedChange = { bestaetigt = it })
+                    Text("Ja, alles ersetzen")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                store.aendern { sicherung.daten }
+                fertig()
+                wiederhergestellt()
+            }, enabled = bestaetigt) { Text("Wiederherstellen") }
+        },
+        dismissButton = { TextButton(onClick = fertig) { Text("Abbrechen") } },
+    )
 }
 
 @Composable
 private fun KonfigImportDialog(store: KassenStore, konfig: VereinKonfig, fertig: () -> Unit, importiert: () -> Unit) {
     val vorhanden = store.daten.passenderVerein(konfig)
-    val umfang = "${konfig.gruppen.size} Gruppen und ${konfig.artikel.size} Artikel"
+    val neueFeste = vorhanden.neueVeranstaltungen(konfig)
+    val umfang = "${konfig.gruppen.size} Gruppen und ${konfig.artikel.size} Artikel" +
+        if (neueFeste.isNotEmpty()) " sowie ${neueFeste.size} neue Veranstaltung(en) (${neueFeste.joinToString { "„${it.name}“" }})" else ""
     fun ausfuehren(art: ImportArt) {
         store.aendern { it.konfigImportieren(konfig, art) }
         fertig()
@@ -147,7 +204,7 @@ private fun KonfigImportDialog(store: KassenStore, konfig: VereinKonfig, fertig:
                         Text("Ersetzen")
                     }
                     Text(
-                        "Alle Gruppen und Artikel werden durch die aus der Datei ersetzt. Veranstaltungen und Umsätze bleiben erhalten.",
+                        "Alle Gruppen und Artikel werden durch die aus der Datei ersetzt. Vorhandene Veranstaltungen und Umsätze bleiben erhalten.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                     OutlinedButton(onClick = { ausfuehren(ImportArt.NEU) }, modifier = Modifier.fillMaxWidth()) {

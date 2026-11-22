@@ -6,6 +6,8 @@ import de.vereinskasse.model.Artikel
 import de.vereinskasse.model.ExportDatei
 import de.vereinskasse.model.Gruppe
 import de.vereinskasse.model.Verein
+import de.vereinskasse.model.Veranstaltung
+import de.vereinskasse.model.VeranstaltungKonfig
 import de.vereinskasse.model.VereinKonfig
 import kotlinx.serialization.json.Json
 
@@ -25,8 +27,35 @@ fun appDatenAusJson(text: String): AppDaten = JSON.decodeFromString(AppDaten.ser
 
 fun Verein.konfigExport(): String = JSON_SCHOEN.encodeToString(
     ExportDatei.serializer(),
-    ExportDatei(typ = ExportDatei.TYP_KONFIG, verein = VereinKonfig(id, name, gruppen, artikel)),
+    ExportDatei(
+        typ = ExportDatei.TYP_KONFIG,
+        verein = VereinKonfig(
+            id, name, gruppen, artikel,
+            veranstaltungen = veranstaltungen.map { VeranstaltungKonfig(it.id, it.name, it.erstelltAm, it.anfangsbestandCent) },
+            aktiveVeranstaltungId = aktiveVeranstaltungId,
+        ),
+    ),
 )
+
+/** Vollständige Datensicherung aller Daten dieses Geräts. */
+fun AppDaten.sicherungExport(zeit: Long): String = JSON.encodeToString(
+    ExportDatei.serializer(),
+    ExportDatei(typ = ExportDatei.TYP_SICHERUNG, daten = this.copy(letzteSicherung = zeit), erstelltAm = zeit),
+)
+
+fun sicherungsDateiname(zeit: Long): String {
+    val d = datum(zeit).split('.')
+    return "Vereinskasse_Sicherung_${d[2]}-${d[1]}-${d[0]}.json"
+}
+
+/** Kennzahlen für die Rückfrage beim Wiederherstellen. */
+fun AppDaten.umfangText(): String {
+    val veranstaltungen = vereine.sumOf { it.veranstaltungen.size }
+    val bestellungen = vereine.sumOf { v -> v.veranstaltungen.sumOf { it.bestellungen.size } }
+    return "${vereine.size} ${if (vereine.size == 1) "Verein" else "Vereine"}, " +
+        "$veranstaltungen ${if (veranstaltungen == 1) "Veranstaltung" else "Veranstaltungen"}, " +
+        "$bestellungen ${if (bestellungen == 1) "Bestellung" else "Bestellungen"}"
+}
 
 fun Abschluss.export(): String = JSON_SCHOEN.encodeToString(
     ExportDatei.serializer(),
@@ -43,6 +72,7 @@ fun dateiname(name: String, zusatz: String, endung: String = "json"): String {
 sealed interface ImportErgebnis {
     data class Konfig(val konfig: VereinKonfig) : ImportErgebnis
     data class AbschlussDatei(val abschluss: Abschluss) : ImportErgebnis
+    data class Sicherung(val daten: AppDaten, val erstelltAm: Long?) : ImportErgebnis
     data class Fehler(val meldung: String) : ImportErgebnis
 }
 
@@ -58,6 +88,7 @@ fun importLesen(text: String): ImportErgebnis {
     return when {
         datei.typ == ExportDatei.TYP_KONFIG && datei.verein != null -> ImportErgebnis.Konfig(datei.verein)
         datei.typ == ExportDatei.TYP_ABSCHLUSS && datei.abschluss != null -> ImportErgebnis.AbschlussDatei(datei.abschluss)
+        datei.typ == ExportDatei.TYP_SICHERUNG && datei.daten != null -> ImportErgebnis.Sicherung(datei.daten, datei.erstelltAm)
         else -> ImportErgebnis.Fehler("Unbekannter Dateiinhalt (Typ \"${datei.typ}\").")
     }
 }
@@ -80,13 +111,45 @@ fun AppDaten.konfigImportieren(konfig: VereinKonfig, art: ImportArt): AppDaten {
                 name = name,
                 gruppen = konfig.gruppen,
                 artikel = konfig.artikel,
-            )
+            ).veranstaltungenUebernehmen(konfig)
             copy(vereine = vereine + neu, aktiverVereinId = neu.id)
         }
-        art == ImportArt.ERSETZEN -> ersetzeVerein(vorhanden.copy(gruppen = konfig.gruppen, artikel = konfig.artikel))
-        else -> ersetzeVerein(vorhanden.ergaenzen(konfig))
+        art == ImportArt.ERSETZEN -> ersetzeVerein(
+            vorhanden.copy(gruppen = konfig.gruppen, artikel = konfig.artikel).veranstaltungenUebernehmen(konfig)
+        )
+        else -> ersetzeVerein(vorhanden.ergaenzen(konfig).veranstaltungenUebernehmen(konfig))
     }
 }
+
+/**
+ * Übernimmt Veranstaltungen aus der Konfiguration: vorhandene (gleiche ID oder gleicher Name)
+ * bleiben unangetastet, neue werden ohne Bestellungen angelegt. Die in der Datei aktive
+ * Veranstaltung wird auch hier aktiv.
+ */
+fun Verein.veranstaltungenUebernehmen(konfig: VereinKonfig): Verein {
+    if (konfig.veranstaltungen.isEmpty()) return this
+    val liste = veranstaltungen.toMutableList()
+    val zuordnung = mutableMapOf<String, String>()
+    for (k in konfig.veranstaltungen) {
+        val vorhanden = liste.firstOrNull { it.id == k.id }
+            ?: liste.firstOrNull { it.name.trim().equals(k.name.trim(), ignoreCase = true) }
+        if (vorhanden != null) {
+            zuordnung[k.id] = vorhanden.id
+        } else {
+            val id = if (liste.any { it.id == k.id }) neueId() else k.id
+            liste += Veranstaltung(id, k.name, k.erstelltAm, anfangsbestandCent = k.anfangsbestandCent)
+            zuordnung[k.id] = id
+        }
+    }
+    val aktiv = konfig.aktiveVeranstaltungId?.let { zuordnung[it] } ?: aktiveVeranstaltungId
+    return copy(veranstaltungen = liste, aktiveVeranstaltungId = aktiv)
+}
+
+/** Neue Veranstaltungen, die ein Import anlegen würde. */
+fun Verein?.neueVeranstaltungen(konfig: VereinKonfig): List<VeranstaltungKonfig> =
+    konfig.veranstaltungen.filter { k ->
+        this == null || veranstaltungen.none { it.id == k.id || it.name.trim().equals(k.name.trim(), ignoreCase = true) }
+    }
 
 fun AppDaten.ersetzeVerein(verein: Verein): AppDaten =
     copy(vereine = vereine.map { if (it.id == verein.id) verein else it })
