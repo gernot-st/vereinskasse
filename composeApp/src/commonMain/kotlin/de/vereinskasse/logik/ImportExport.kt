@@ -25,7 +25,7 @@ fun appDatenAusJson(text: String): AppDaten = JSON.decodeFromString(AppDaten.ser
 
 // ---------- Export ----------
 
-fun Verein.konfigExport(): String = JSON_SCHOEN.encodeToString(
+fun Verein.konfigExport(logo: ByteArray? = null): String = JSON_SCHOEN.encodeToString(
     ExportDatei.serializer(),
     ExportDatei(
         typ = ExportDatei.TYP_KONFIG,
@@ -33,14 +33,21 @@ fun Verein.konfigExport(): String = JSON_SCHOEN.encodeToString(
             id, name, gruppen, artikel,
             veranstaltungen = veranstaltungen.map { VeranstaltungKonfig(it.id, it.name, it.erstelltAm, it.anfangsbestandCent) },
             aktiveVeranstaltungId = aktiveVeranstaltungId,
+            logoBase64 = logo?.let { logoAlsBase64(it) },
+            designFarbe = designFarbe,
         ),
     ),
 )
 
 /** Vollständige Datensicherung aller Daten dieses Geräts. */
-fun AppDaten.sicherungExport(zeit: Long): String = JSON.encodeToString(
+fun AppDaten.sicherungExport(zeit: Long, logos: Map<String, ByteArray> = emptyMap()): String = JSON.encodeToString(
     ExportDatei.serializer(),
-    ExportDatei(typ = ExportDatei.TYP_SICHERUNG, daten = this.copy(letzteSicherung = zeit), erstelltAm = zeit),
+    ExportDatei(
+        typ = ExportDatei.TYP_SICHERUNG,
+        daten = this.copy(letzteSicherung = zeit),
+        erstelltAm = zeit,
+        logos = logos.mapValues { logoAlsBase64(it.value) },
+    ),
 )
 
 fun sicherungsDateiname(zeit: Long): String {
@@ -72,7 +79,7 @@ fun dateiname(name: String, zusatz: String, endung: String = "json"): String {
 sealed interface ImportErgebnis {
     data class Konfig(val konfig: VereinKonfig) : ImportErgebnis
     data class AbschlussDatei(val abschluss: Abschluss) : ImportErgebnis
-    data class Sicherung(val daten: AppDaten, val erstelltAm: Long?) : ImportErgebnis
+    data class Sicherung(val daten: AppDaten, val erstelltAm: Long?, val logos: Map<String, String> = emptyMap()) : ImportErgebnis
     data class Fehler(val meldung: String) : ImportErgebnis
 }
 
@@ -88,7 +95,7 @@ fun importLesen(text: String): ImportErgebnis {
     return when {
         datei.typ == ExportDatei.TYP_KONFIG && datei.verein != null -> ImportErgebnis.Konfig(datei.verein)
         datei.typ == ExportDatei.TYP_ABSCHLUSS && datei.abschluss != null -> ImportErgebnis.AbschlussDatei(datei.abschluss)
-        datei.typ == ExportDatei.TYP_SICHERUNG && datei.daten != null -> ImportErgebnis.Sicherung(datei.daten, datei.erstelltAm)
+        datei.typ == ExportDatei.TYP_SICHERUNG && datei.daten != null -> ImportErgebnis.Sicherung(datei.daten, datei.erstelltAm, datei.logos)
         else -> ImportErgebnis.Fehler("Unbekannter Dateiinhalt (Typ \"${datei.typ}\").")
     }
 }
@@ -100,7 +107,11 @@ fun AppDaten.passenderVerein(konfig: VereinKonfig): Verein? =
 
 enum class ImportArt { ERSETZEN, ERGAENZEN, NEU }
 
-fun AppDaten.konfigImportieren(konfig: VereinKonfig, art: ImportArt): AppDaten {
+/**
+ * [logoId]: bereits gespeichertes Logo aus der Datei (null = Datei hat kein Logo).
+ * Logo und Grundfarbe aus der Datei werden übernommen; fehlen sie dort, bleibt das Vorhandene.
+ */
+fun AppDaten.konfigImportieren(konfig: VereinKonfig, art: ImportArt, logoId: String? = null): AppDaten {
     val vorhanden = passenderVerein(konfig)
     return when {
         art == ImportArt.NEU || vorhanden == null -> {
@@ -111,13 +122,15 @@ fun AppDaten.konfigImportieren(konfig: VereinKonfig, art: ImportArt): AppDaten {
                 name = name,
                 gruppen = konfig.gruppen,
                 artikel = konfig.artikel,
+                logoId = logoId,
+                designFarbe = konfig.designFarbe,
             ).veranstaltungenUebernehmen(konfig)
             copy(vereine = vereine + neu, aktiverVereinId = neu.id)
         }
         art == ImportArt.ERSETZEN -> ersetzeVerein(
-            vorhanden.copy(gruppen = konfig.gruppen, artikel = konfig.artikel).veranstaltungenUebernehmen(konfig)
+            vorhanden.copy(gruppen = konfig.gruppen, artikel = konfig.artikel).veranstaltungenUebernehmen(konfig).designUebernehmen(konfig, logoId)
         )
-        else -> ersetzeVerein(vorhanden.ergaenzen(konfig).veranstaltungenUebernehmen(konfig))
+        else -> ersetzeVerein(vorhanden.ergaenzen(konfig).veranstaltungenUebernehmen(konfig).designUebernehmen(konfig, logoId))
     }
 }
 
@@ -144,6 +157,9 @@ fun Verein.veranstaltungenUebernehmen(konfig: VereinKonfig): Verein {
     val aktiv = konfig.aktiveVeranstaltungId?.let { zuordnung[it] } ?: aktiveVeranstaltungId
     return copy(veranstaltungen = liste, aktiveVeranstaltungId = aktiv)
 }
+
+fun Verein.designUebernehmen(konfig: VereinKonfig, logoId: String?): Verein =
+    copy(logoId = logoId ?: this.logoId, designFarbe = konfig.designFarbe ?: designFarbe)
 
 /** Neue Veranstaltungen, die ein Import anlegen würde. */
 fun Verein?.neueVeranstaltungen(konfig: VereinKonfig): List<VeranstaltungKonfig> =

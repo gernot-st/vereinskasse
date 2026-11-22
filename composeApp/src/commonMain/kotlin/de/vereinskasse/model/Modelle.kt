@@ -24,6 +24,10 @@ data class Verein(
     val artikel: List<Artikel> = emptyList(),
     val veranstaltungen: List<Veranstaltung> = emptyList(),
     val aktiveVeranstaltungId: String? = null,
+    /** Kennung der Logo-Datei auf dem Gerät (null = kein Logo). */
+    val logoId: String? = null,
+    /** Grundfarbe des Designs als ARGB (null = Standard). */
+    val designFarbe: Long? = null,
 )
 
 @Serializable
@@ -140,6 +144,8 @@ data class ExportDatei(
     /** Nur bei Datensicherung: alle Daten des Geräts. */
     val daten: AppDaten? = null,
     val erstelltAm: Long? = null,
+    /** Nur bei Datensicherung: Logos (Kennung -> Bild als Base64). */
+    val logos: Map<String, String> = emptyMap(),
 ) {
     companion object {
         const val FORMAT = "vereinskasse"
@@ -159,6 +165,9 @@ data class VereinKonfig(
     /** Ab Version 1.4: Veranstaltungen ohne Umsätze. */
     val veranstaltungen: List<VeranstaltungKonfig> = emptyList(),
     val aktiveVeranstaltungId: String? = null,
+    /** Ab Version 1.5: Logo (Base64, PNG/JPEG) und Grundfarbe. */
+    val logoBase64: String? = null,
+    val designFarbe: Long? = null,
 )
 
 /** Veranstaltung ohne Bestellungen (für die Konfiguration). */

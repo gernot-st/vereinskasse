@@ -293,3 +293,41 @@ class SicherungUndVeranstaltungTest {
         assertTrue(sicherungsDateiname(1_781_373_600_000).startsWith("Vereinskasse_Sicherung_2026-06-1"))
     }
 }
+
+class DesignTest {
+    @Test
+    fun farbenUndKontrast() {
+        val gelb = 0xFFF4B400
+        assertTrue(kontrast(gelb, 0xFFFFFFFF) < 3.0)
+        val dunkler = mitKontrast(gelb, 0xFFFFFFFF, 4.5)
+        assertTrue(kontrast(dunkler, 0xFFFFFFFF) >= 4.5)
+        // Farbton bleibt erhalten
+        assertTrue(kotlin.math.abs(argbZuHsl(dunkler).h - argbZuHsl(gelb).h) < 3)
+        val hsl = argbZuHsl(0xFF1E88E5)
+        assertEquals(0xFF1E88E5, hslZuArgb(hsl), "Rundreise HSL")
+        assertEquals(21.0, kontrast(0xFF000000, 0xFFFFFFFF), 0.01)
+    }
+
+    @Test
+    fun logoUndFarbeImExport() {
+        val verein = Verein("v1", "TSV", designFarbe = 0xFF8E24AA, logoId = "alt")
+        val logo = byteArrayOf(1, 2, 3, 4)
+        val konfig = (importLesen(verein.konfigExport(logo)) as ImportErgebnis.Konfig).konfig
+        assertEquals(0xFF8E24AA, konfig.designFarbe)
+        assertTrue(logoAusBase64(konfig.logoBase64!!)!!.contentEquals(logo))
+
+        // Ergänzen: Datei hat Logo/Farbe -> übernehmen
+        val lokal = AppDaten(vereine = listOf(Verein("v1", "TSV", logoId = "lokal", designFarbe = 1)))
+        val v = lokal.konfigImportieren(konfig, ImportArt.ERGAENZEN, logoId = "neu").vereine.single()
+        assertEquals("neu", v.logoId)
+        assertEquals(0xFF8E24AA, v.designFarbe)
+        // Datei ohne Logo/Farbe -> Vorhandenes bleibt
+        val ohne = konfig.copy(logoBase64 = null, designFarbe = null)
+        val w = lokal.konfigImportieren(ohne, ImportArt.ERSETZEN, logoId = null).vereine.single()
+        assertEquals("lokal", w.logoId)
+        assertEquals(1L, w.designFarbe)
+
+        val sicherung = importLesen(AppDaten(vereine = listOf(verein)).sicherungExport(0, mapOf("alt" to logo))) as ImportErgebnis.Sicherung
+        assertTrue(logoAusBase64(sicherung.logos.getValue("alt"))!!.contentEquals(logo))
+    }
+}

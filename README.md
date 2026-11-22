@@ -33,6 +33,11 @@ Keine Rechnungen, kein Finanzamt, keine Cloud: Alle Daten bleiben auf dem Gerät
   (ohne Umsätze). Beim Import wird gefragt: ergänzen, ersetzen oder als neuen Verein anlegen.
   Vorhandene Veranstaltungen (gleicher Name) bleiben unangetastet, neue werden angelegt; die im
   Absender aktive Veranstaltung wird auch beim Empfänger aktiv. So haben alle Kassen dieselbe Veranstaltung.
+- **Logo und Grundfarbe je Verein** (im Verein unter „Logo & Farbe“): Logo aus der Galerie
+  (automatisch auf max. 512 px verkleinert), Grundfarbe aus Palette, als Farbcode oder aus dem Logo
+  übernommen. Die Farbe färbt Kopfzeile, Knöpfe und Auswahl (hell und dunkel, mit lesbarem Kontrast);
+  Gruppenfarben, Diagrammfarben und Signalfarben bleiben unverändert. Logo und Farbe werden beim
+  Teilen an andere Handys und in der Datensicherung mitgenommen (nicht in CSV).
 - **Datensicherung** (in der Vereinsliste): alle Daten des Geräts inkl. Bestellungen in eine Datei;
   Wiederherstellen ersetzt nach Rückfrage alle Daten (für Handywechsel oder Neuinstallation)
 

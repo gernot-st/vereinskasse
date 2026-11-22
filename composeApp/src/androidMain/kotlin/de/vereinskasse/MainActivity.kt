@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,7 +61,8 @@ object AppZustand {
     fun store(context: Context): KassenStore = store ?: KassenStore(
         AndroidSpeicher(context.applicationContext),
         CoroutineScope(SupervisorJob() + Dispatchers.Default),
-    ).also { store = it }
+        AndroidLogoSpeicher(context.applicationContext),
+    ).also { store = it; it.logosAufraeumen() }
 }
 
 class MainActivity : ComponentActivity(), Plattform {
@@ -69,6 +71,40 @@ class MainActivity : ComponentActivity(), Plattform {
 
     private val dateiAuswahl = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) uriLesen(uri)
+    }
+
+    private var bildErgebnis: ((ByteArray?) -> Unit)? = null
+
+    private val bildAuswahl = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val ergebnis = bildErgebnis ?: return@registerForActivityResult
+        bildErgebnis = null
+        if (uri == null) {
+            ergebnis(null)
+            return@registerForActivityResult
+        }
+        // Verkleinern im Hintergrund, Ergebnis auf dem Hauptthread
+        Thread {
+            val bytes = try {
+                contentResolver.openInputStream(uri)?.use { it.readBytes() }?.let { bildVerkleinern(it) }
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                if (bytes == null) Toast.makeText(this, "Das Bild konnte nicht gelesen werden.", Toast.LENGTH_LONG).show()
+                ergebnis(bytes)
+            }
+        }.start()
+    }
+
+    override fun bildAuswaehlen(ergebnis: (ByteArray?) -> Unit) {
+        bildErgebnis = ergebnis
+        try {
+            bildAuswahl.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        } catch (e: Exception) {
+            bildErgebnis = null
+            ergebnis(null)
+            Toast.makeText(this, "Keine Bildauswahl verfügbar", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

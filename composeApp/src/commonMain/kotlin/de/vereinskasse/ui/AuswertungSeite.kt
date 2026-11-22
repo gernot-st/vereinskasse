@@ -106,6 +106,7 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = kopfzeile(),
                 title = { Text("Auswertung") },
                 navigationIcon = { IconButton(onClick = zurueck) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
                 actions = {
@@ -202,6 +203,7 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                         bestellungen = (veranstaltung.bestellungen + veranstaltung.fremdAbschluesse.flatMap { it.bestellungen }).amTag(tag),
                         mehrereGeraete = veranstaltung.fremdAbschluesse.any { it.enthaeltBestellungen },
                         fehlendeGeraete = fremdeOhneZeit.map { it.geraet },
+                        logo = store.logoBild(verein.logoId),
                         plattform = plattform,
                     )
                 }

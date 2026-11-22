@@ -20,10 +20,12 @@ import de.vereinskasse.logik.ImportArt
 import de.vereinskasse.logik.ImportDatei
 import de.vereinskasse.logik.ImportErgebnis
 import de.vereinskasse.logik.textDekodieren
+import de.vereinskasse.logik.logoAusBase64
 import de.vereinskasse.logik.neueVeranstaltungen
 import de.vereinskasse.logik.umfangText
 import de.vereinskasse.logik.datumZeit
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Checkbox
 import androidx.compose.ui.Alignment
@@ -56,6 +58,7 @@ fun App(
     zurueckHandler: ZurueckHandler = { _, _ -> },
     startSeiten: List<Seite>? = null,
     kassenZustand: KassenZustand = remember { KassenZustand() },
+    dunkel: Boolean? = null,
 ) {
     var stapel by remember {
         mutableStateOf(startSeiten ?: if (store.aktiverVerein == null) listOf(Seite.Vereine) else listOf(Seite.Kasse))
@@ -64,7 +67,7 @@ fun App(
     val zurueck: () -> Unit = { if (stapel.size > 1) stapel = stapel.dropLast(1) }
     val zurKasse: () -> Unit = { stapel = listOf(Seite.Kasse) }
 
-    VereinskasseTheme {
+    VereinskasseTheme(dunkel = dunkel ?: isSystemInDarkTheme(), grundfarbe = store.aktiverVerein?.designFarbe) {
         zurueckHandler(stapel.size > 1, zurueck)
 
         when (val seite = stapel.last()) {
@@ -157,7 +160,9 @@ private fun WiederherstellenDialog(
         },
         confirmButton = {
             TextButton(onClick = {
+                for ((id, text) in sicherung.logos) logoAusBase64(text)?.let { store.logoSpeichern(it, id) }
                 store.aendern { sicherung.daten }
+                store.logosAufraeumen()
                 fertig()
                 wiederhergestellt()
             }, enabled = bestaetigt) { Text("Wiederherstellen") }
@@ -173,7 +178,9 @@ private fun KonfigImportDialog(store: KassenStore, konfig: VereinKonfig, fertig:
     val umfang = "${konfig.gruppen.size} Gruppen und ${konfig.artikel.size} Artikel" +
         if (neueFeste.isNotEmpty()) " sowie ${neueFeste.size} neue Veranstaltung(en) (${neueFeste.joinToString { "„${it.name}“" }})" else ""
     fun ausfuehren(art: ImportArt) {
-        store.aendern { it.konfigImportieren(konfig, art) }
+        val logoId = konfig.logoBase64?.let { logoAusBase64(it) }?.let { store.logoSpeichern(it) }
+        store.aendern { it.konfigImportieren(konfig, art, logoId) }
+        store.logosAufraeumen()
         fertig()
         importiert()
     }

@@ -42,6 +42,19 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.vereinskasse.logik.GRUPPEN_FARBEN
+import de.vereinskasse.logik.Hsl
+import de.vereinskasse.logik.argbZuHsl
+import de.vereinskasse.logik.hslZuArgb
+import de.vereinskasse.logik.mitKontrast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import de.vereinskasse.logik.geldEingabe
 import de.vereinskasse.logik.parseGeld
 
@@ -70,8 +83,78 @@ private val DunklesSchema = darkColorScheme(
 )
 
 @Composable
-fun VereinskasseTheme(dunkel: Boolean = isSystemInDarkTheme(), inhalt: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (dunkel) DunklesSchema else HellesSchema, content = inhalt)
+fun VereinskasseTheme(
+    dunkel: Boolean = isSystemInDarkTheme(),
+    grundfarbe: Long? = null,
+    inhalt: @Composable () -> Unit,
+) {
+    val schema = remember(dunkel, grundfarbe) {
+        when {
+            grundfarbe == null -> if (dunkel) DunklesSchema else HellesSchema
+            dunkel -> dunklesSchemaAus(grundfarbe)
+            else -> hellesSchemaAus(grundfarbe)
+        }
+    }
+    MaterialTheme(colorScheme = schema, content = inhalt)
+}
+
+private fun ton(h: Hsl, s: Float, l: Float) = Color(hslZuArgb(Hsl(h.h, s.coerceIn(0f, 1f), l)))
+
+/** Helles Farbschema aus einer Grundfarbe; zu helle Farben werden für lesbare Schrift abgedunkelt. */
+fun hellesSchemaAus(grundfarbe: Long): ColorScheme {
+    val weiss = 0xFFFFFFFF
+    val primaer = mitKontrast(grundfarbe, weiss, 4.5)
+    val h = argbZuHsl(primaer)
+    val sekundaer = mitKontrast(hslZuArgb(Hsl(h.h, h.s * 0.3f, 0.4f)), weiss, 4.5)
+    return HellesSchema.copy(
+        primary = Color(primaer),
+        onPrimary = Color.White,
+        primaryContainer = ton(h, h.s * 0.85f, 0.9f),
+        onPrimaryContainer = ton(h, h.s, 0.12f),
+        secondary = Color(sekundaer),
+        onSecondary = Color.White,
+        secondaryContainer = ton(h, h.s * 0.35f, 0.88f),
+        onSecondaryContainer = ton(h, h.s * 0.4f, 0.12f),
+    )
+}
+
+fun dunklesSchemaAus(grundfarbe: Long): ColorScheme {
+    val flaeche = 0xFF1C1B1F
+    val basis = argbZuHsl(grundfarbe)
+    val primaer = mitKontrast(hslZuArgb(Hsl(basis.h, basis.s, 0.72f)), flaeche, 4.5)
+    val h = argbZuHsl(primaer)
+    return DunklesSchema.copy(
+        primary = Color(primaer),
+        onPrimary = ton(h, h.s, 0.15f),
+        primaryContainer = ton(h, h.s * 0.8f, 0.28f),
+        onPrimaryContainer = ton(h, h.s, 0.9f),
+        secondary = Color(mitKontrast(hslZuArgb(Hsl(h.h, h.s * 0.3f, 0.78f)), flaeche, 4.5)),
+        onSecondary = ton(h, h.s * 0.3f, 0.15f),
+        secondaryContainer = ton(h, h.s * 0.3f, 0.28f),
+        onSecondaryContainer = ton(h, h.s * 0.3f, 0.9f),
+    )
+}
+
+/** Farben der Kopfzeile: Vereinsfarbe als Hintergrund. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun kopfzeile() = TopAppBarDefaults.topAppBarColors(
+    containerColor = MaterialTheme.colorScheme.primaryContainer,
+    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+)
+
+/** Vereinslogo auf hellem Feld (damit dunkle Logos auch im Dunkelmodus sichtbar sind). */
+@Composable
+fun LogoBild(bild: ImageBitmap?, groesse: Dp, modifier: Modifier = Modifier) {
+    if (bild == null) return
+    Box(
+        modifier.size(groesse).background(Color.White, RoundedCornerShape(groesse / 5)).padding(groesse / 14),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(bild, contentDescription = "Vereinslogo", contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+    }
 }
 
 /** Grün für positive Beträge (Rückgeld etc.). */

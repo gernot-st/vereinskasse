@@ -35,7 +35,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -78,7 +78,9 @@ import de.vereinskasse.model.Verein
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-private enum class Reiter(val titel: String) { ARTIKEL("Artikel"), GRUPPEN("Gruppen"), VERANSTALTUNGEN("Veranstaltungen") }
+private enum class Reiter(val titel: String) {
+    ARTIKEL("Artikel"), GRUPPEN("Gruppen"), VERANSTALTUNGEN("Veranstaltungen"), DESIGN("Logo & Farbe")
+}
 
 /** Markiert im Artikel-Filter "ohne Gruppe". */
 private const val OHNE_GRUPPE = "__ohne__"
@@ -110,6 +112,7 @@ fun VereinSeite(
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = kopfzeile(),
                 title = { Text(verein.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = zurueck) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
                 actions = {
@@ -122,7 +125,7 @@ fun VereinSeite(
                                 leadingIcon = { Icon(Icons.Default.Share, null) },
                                 onClick = {
                                     menueOffen = false
-                                    plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport())
+                                    plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport(store.logoBytes(verein.logoId)))
                                 },
                             )
                             HorizontalDivider()
@@ -150,7 +153,7 @@ fun VereinSeite(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
+            if (reiter != Reiter.DESIGN) ExtendedFloatingActionButton(
                 onClick = {
                     when (reiter) {
                         Reiter.ARTIKEL -> artikelDialog = Artikel(
@@ -161,6 +164,7 @@ fun VereinSeite(
                             "", "", GRUPPEN_FARBEN[verein.gruppen.size % GRUPPEN_FARBEN.size],
                         )
                         Reiter.VERANSTALTUNGEN -> neueVeranstaltung = true
+                        Reiter.DESIGN -> {}
                     }
                 },
                 icon = { Icon(Icons.Default.Add, null) },
@@ -170,6 +174,7 @@ fun VereinSeite(
                             Reiter.ARTIKEL -> "Artikel"
                             Reiter.GRUPPEN -> "Gruppe"
                             Reiter.VERANSTALTUNGEN -> "Veranstaltung"
+                            Reiter.DESIGN -> ""
                         }
                     )
                 },
@@ -177,9 +182,9 @@ fun VereinSeite(
         },
     ) { innen ->
         Column(Modifier.padding(innen).fillMaxSize()) {
-            PrimaryTabRow(selectedTabIndex = reiter.ordinal) {
+            PrimaryScrollableTabRow(selectedTabIndex = reiter.ordinal, edgePadding = 0.dp) {
                 for (r in Reiter.entries) {
-                    Tab(selected = reiter == r, onClick = { reiter = r }, text = { Text(r.titel, maxLines = 1, softWrap = false, fontSize = 13.sp) })
+                    Tab(selected = reiter == r, onClick = { reiter = r }, text = { Text(r.titel, maxLines = 1, softWrap = false) })
                 }
             }
             when (reiter) {
@@ -190,6 +195,7 @@ fun VereinSeite(
                 )
                 Reiter.GRUPPEN -> GruppenReiter(store, verein, onBearbeiten = { gruppeDialog = it })
                 Reiter.VERANSTALTUNGEN -> VeranstaltungenReiter(store, verein, onBearbeiten = { veranstaltungDialog = it })
+                Reiter.DESIGN -> DesignReiter(store, plattform, verein)
             }
         }
     }

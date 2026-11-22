@@ -136,7 +136,10 @@ fun KasseSeite(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
+                colors = kopfzeile(),
                 title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    LogoBild(store.logoBild(verein?.logoId), 40.dp, Modifier.padding(end = 10.dp))
                     Column {
                         Text(verein?.name ?: "Vereinskasse", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (veranstaltung != null) {
@@ -147,6 +150,7 @@ fun KasseSeite(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
+                    }
                     }
                 },
                 actions = {

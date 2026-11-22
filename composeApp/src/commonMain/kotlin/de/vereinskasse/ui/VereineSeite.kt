@@ -69,6 +69,7 @@ fun VereineSeite(
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = kopfzeile(),
                 title = { Text("Vereine") },
                 navigationIcon = {
                     if (zurueck != null) {
@@ -105,7 +106,10 @@ fun VereineSeite(
                         store.aendern { it.copy(aktiverVereinId = verein.id) }
                         oeffne(Seite.VereinBearbeiten(verein.id))
                     },
-                    onTeilen = { plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport()) },
+                    logo = store.logoBild(verein.logoId),
+                    onTeilen = {
+                        plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport(store.logoBytes(verein.logoId)))
+                    },
                     onUmbenennen = { umbenennen = verein },
                     onLoeschen = { loeschen = verein },
                 )
@@ -162,7 +166,10 @@ fun VereineSeite(
                         Button(onClick = {
                             val zeit = jetzt()
                             store.aendern { it.copy(letzteSicherung = zeit) }
-                            plattform.teileDatei(sicherungsDateiname(zeit), store.daten.sicherungExport(zeit))
+                            val logos = store.daten.vereine.mapNotNull { v ->
+                                v.logoId?.let { id -> store.logoBytes(id)?.let { id to it } }
+                            }.toMap()
+                            plattform.teileDatei(sicherungsDateiname(zeit), store.daten.sicherungExport(zeit, logos))
                         }, modifier = Modifier.weight(1f)) {
                             Text("Sicherung erstellen")
                         }
@@ -219,6 +226,7 @@ fun VereineSeite(
                         aktiverVereinId = if (d.aktiverVereinId == verein.id) null else d.aktiverVereinId,
                     )
                 }
+                store.logosAufraeumen()
                 loeschen = null
             },
             onAbbrechen = { loeschen = null },
@@ -230,6 +238,7 @@ fun VereineSeite(
 private fun VereinKarte(
     verein: Verein,
     aktiv: Boolean,
+    logo: androidx.compose.ui.graphics.ImageBitmap?,
     onWaehlen: () -> Unit,
     onBearbeiten: () -> Unit,
     onTeilen: () -> Unit,
@@ -239,6 +248,7 @@ private fun VereinKarte(
     Card(Modifier.fillMaxWidth().clickable(onClick = onWaehlen)) {
         Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             RadioButton(selected = aktiv, onClick = onWaehlen)
+            LogoBild(logo, 44.dp, Modifier.padding(end = 10.dp))
             Column(Modifier.weight(1f)) {
                 Text(verein.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(

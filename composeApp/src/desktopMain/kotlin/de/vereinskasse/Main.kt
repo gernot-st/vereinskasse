@@ -36,7 +36,11 @@ class DateiSpeicher(private val datei: File) : Speicher {
 
 fun main() = application {
     val scope = rememberCoroutineScope()
-    val store = remember { KassenStore(DateiSpeicher(File(System.getProperty("user.home"), ".vereinskasse/daten.json")), scope) }
+    val store = remember { KassenStore(
+            DateiSpeicher(File(System.getProperty("user.home"), ".vereinskasse/daten.json")),
+            scope,
+            DateiLogoSpeicher(File(System.getProperty("user.home"), ".vereinskasse/logos")),
+        ) }
     var importDatei by remember { mutableStateOf<ImportDatei?>(null) }
     val plattform = remember {
         object : Plattform {
@@ -50,6 +54,10 @@ fun main() = application {
                 val ziel = File(System.getProperty("user.home"), dateiname)
                 javax.imageio.ImageIO.write(bild.toAwtImage(), "png", ziel)
                 println("Bild gespeichert: $ziel")
+            }
+            override fun bildAuswaehlen(ergebnis: (ByteArray?) -> Unit) {
+                val auswahl = JFileChooser()
+                ergebnis(if (auswahl.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) bildVerkleinern(auswahl.selectedFile) else null)
             }
             override fun dateiOeffnen() {
                 val auswahl = JFileChooser()

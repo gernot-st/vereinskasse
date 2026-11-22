@@ -73,6 +73,7 @@ fun VerlaufAbschnitt(
     mehrereGeraete: Boolean,
     fehlendeGeraete: List<String>,
     plattform: Plattform,
+    logo: androidx.compose.ui.graphics.ImageBitmap? = null,
     startArt: DiagrammArt = DiagrammArt.HOCHLAUF,
     startGewaehlt: Int? = null,
 ) {
@@ -157,14 +158,19 @@ fun VerlaufAbschnitt(
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(12.dp),
             ) {
-                Text("Verkaufsverlauf – $titel", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    (if (art == DiagrammArt.HOCHLAUF) "Verkaufte Stück, aufsummiert" else "Verkaufte Stück pro Viertelstunde") +
-                        (if (mehrereGeraete) " · alle Geräte" else "") +
-                        (if (!mitHelfer) " · ohne Helfer" else ""),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LogoBild(logo, 44.dp, Modifier.padding(end = 10.dp))
+                    Column {
+                        Text("Verkaufsverlauf – $titel", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            (if (art == DiagrammArt.HOCHLAUF) "Verkaufte Stück, aufsummiert" else "Verkaufte Stück pro Viertelstunde") +
+                                (if (mehrereGeraete) " · alle Geräte" else "") +
+                                (if (!mitHelfer) " · ohne Helfer" else ""),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
                 if (serien.isEmpty()) {
                     Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {

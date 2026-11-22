@@ -45,6 +45,7 @@ class Bildschirmfotos {
         override fun teileDatei(dateiname: String, inhalt: String, mimeType: String) {}
         override fun teileBild(dateiname: String, bild: androidx.compose.ui.graphics.ImageBitmap) {}
         override fun dateiOeffnen() {}
+        override fun bildAuswaehlen(ergebnis: (ByteArray?) -> Unit) = ergebnis(null)
     }
 
     private val getraenke = Gruppe("g1", "Getränke", 0xFF1E88E5)
@@ -88,7 +89,52 @@ class Bildschirmfotos {
     }
 
     private fun store(daten: AppDaten = beispielDaten()) =
-        KassenStore(SpeicherImRam(de.vereinskasse.logik.JSON.encodeToString(AppDaten.serializer(), daten)), CoroutineScope(Dispatchers.Unconfined))
+        KassenStore(
+            SpeicherImRam(de.vereinskasse.logik.JSON.encodeToString(AppDaten.serializer(), daten)),
+            CoroutineScope(Dispatchers.Unconfined),
+            de.vereinskasse.logik.LogoSpeicherImRam(::bildDekodieren),
+        )
+
+    /** Beispiel-Logo: Wappen mit "TSV" (dunkelblau/gelb, transparenter Hintergrund). */
+    private fun beispielLogo(): ByteArray {
+        val flaeche = org.jetbrains.skia.Surface.makeRasterN32Premul(300, 300)
+        val c = flaeche.canvas
+        val farbe = { argb: Int -> org.jetbrains.skia.Paint().apply { color = argb; isAntiAlias = true } }
+        val wappen = org.jetbrains.skia.Path().moveTo(30f, 30f).lineTo(270f, 30f).lineTo(270f, 160f)
+            .quadTo(270f, 250f, 150f, 290f).quadTo(30f, 250f, 30f, 160f).closePath()
+        c.drawPath(wappen, farbe(0xFF1A3A8F.toInt()))
+        c.drawRect(org.jetbrains.skia.Rect.makeXYWH(30f, 120f, 240f, 40f), farbe(0xFFF4B400.toInt()))
+        val schrift = org.jetbrains.skia.Font(org.jetbrains.skia.FontMgr.default.matchFamilyStyle("DejaVu Sans", org.jetbrains.skia.FontStyle.BOLD), 80f)
+        c.drawString("TSV", 72f, 105f, schrift, farbe(0xFFFFFFFF.toInt()))
+        return flaeche.makeImageSnapshot().encodeToData(EncodedImageFormat.PNG)!!.bytes
+    }
+
+    private fun storeMitDesign(): KassenStore {
+        val s = store(festDaten())
+        val id = s.logoSpeichern(beispielLogo())!!
+        s.vereinAendern("ver1") { it.copy(logoId = id, designFarbe = 0xFF1A3A8F) }
+        return s
+    }
+
+    @Test
+    fun design() {
+        val s = storeMitDesign()
+        val logo = s.logoBild(s.aktiverVerein!!.logoId)!!
+        // Hauptfarbe des Logos: Blau oder Gelb, nicht Weiß
+        val farbe = de.vereinskasse.logik.hauptfarbe(logo)!!
+        println("Hauptfarbe Logo: " + farbe.toString(16))
+        foto("19_kasse_design", 412, 892) { App(s, plattform, null, {}, kassenZustand = gefuellterKorb(), dunkel = false) }
+        foto("20_kasse_design_dunkel", 412, 892) { App(s, plattform, null, {}, kassenZustand = gefuellterKorb(), dunkel = true) }
+        foto("21_design_reiter", 412, 1400) {
+            VereinskasseTheme(grundfarbe = s.aktiverVerein!!.designFarbe) {
+                de.vereinskasse.ui.VereinSeite(s, plattform, "ver1", {}, startReiter = 3)
+            }
+        }
+        foto("22_vereine_logo", 412, 600) { App(s, plattform, null, {}, startSeiten = listOf(Seite.Kasse, Seite.Vereine), dunkel = false) }
+        // Gelbe Vereinsfarbe: muss für Schrift abgedunkelt werden
+        s.vereinAendern("ver1") { it.copy(designFarbe = 0xFFF4B400) }
+        foto("23_kasse_gelb", 412, 892) { App(s, plattform, null, {}, kassenZustand = gefuellterKorb(), dunkel = false) }
+    }
 
     private fun foto(name: String, breiteDp: Int, hoeheDp: Int, dunkel: Boolean = false, inhalt: @Composable () -> Unit) {
         ImageComposeScene(breiteDp * 2, hoeheDp * 2, Density(2f)) {
@@ -201,7 +247,8 @@ class Bildschirmfotos {
                         androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
                             VerlaufAbschnitt(
                                 s.aktiverVerein!!, "Sommerfest 2026" + (tag?.let { " · " + tagText(it) } ?: ""),
-                                alle.amTag(tag), true, emptyList(), plattform, art, gewaehlt,
+                                alle.amTag(tag), true, emptyList(), plattform, logo = s.logoBild(s.aktiverVerein!!.logoId),
+                                startArt = art, startGewaehlt = gewaehlt,
                             )
                         }
                     }
