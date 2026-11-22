@@ -3,6 +3,7 @@ package de.vereinskasse
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,6 +16,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.content.FileProvider
 import de.vereinskasse.logik.KassenStore
 import de.vereinskasse.logik.Plattform
@@ -149,6 +152,25 @@ class MainActivity : ComponentActivity(), Plattform {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(Intent.createChooser(intent, "Datei teilen"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Teilen fehlgeschlagen: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun teileBild(dateiname: String, bild: ImageBitmap) {
+        try {
+            val ordner = File(cacheDir, "export").apply { mkdirs() }
+            ordner.listFiles()?.forEach { it.delete() }
+            val datei = File(ordner, dateiname)
+            datei.outputStream().use { bild.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val uri = FileProvider.getUriForFile(this, "$packageName.dateien", datei)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newRawUri(dateiname, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Grafik teilen"))
         } catch (e: Exception) {
             Toast.makeText(this, "Teilen fehlgeschlagen: ${e.message}", Toast.LENGTH_LONG).show()
         }

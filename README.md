@@ -15,9 +15,15 @@ Keine Rechnungen, kein Finanzamt, keine Cloud: Alle Daten bleiben auf dem Gerät
   - Bezahlen mit Schnelltasten (Passend, 20 €, 50 € …) und großer Rückgeld-Anzeige
   - Letzte Bestellung stornieren
 - **Auswertung** je Veranstaltung: Umsatz, Stückzahlen, Pfand, Helfer, Stornos
+  - Auswahl eines Festtags (Tageswechsel um 6:00 Uhr – nach Mitternacht zählt noch zum Vortag)
+  - Verkaufsverlauf auf Viertelstundenbasis: Hochlauf (aufsummiert) oder Stück pro Viertelstunde,
+    bis zu 8 Artikel wählbar (Top 5, Alle, je Gruppe), Helferbuchungen ein-/ausblendbar,
+    Antippen zeigt die Werte einer Viertelstunde, Grafik als Bild per WhatsApp teilen
   - Kassenstand: Anfangsbestand (Wechselgeld), Soll, gezählter Ist-Bestand, Differenz
   - Per WhatsApp als Text teilen
-  - Mehrere Kassen zusammenführen (Abschluss-Datei von anderen Geräten importieren)
+  - Mehrere Kassen zusammenführen (Abschluss-Datei von anderen Geräten importieren).
+    Ab Version 1.1 enthält die Datei alle Bestellungen mit Uhrzeit, damit Tagesauswahl und Verlauf
+    auch die anderen Kassen umfassen.
 - **Konfiguration per WhatsApp** exportieren und importieren – beim Import wird gefragt:
   ergänzen, ersetzen oder als neuen Verein anlegen
 

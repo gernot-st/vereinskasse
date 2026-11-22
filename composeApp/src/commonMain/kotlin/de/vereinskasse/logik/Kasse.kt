@@ -7,6 +7,7 @@ import de.vereinskasse.model.Bestellung
 import de.vereinskasse.model.Position
 import de.vereinskasse.model.Veranstaltung
 import de.vereinskasse.model.Verein
+import kotlinx.datetime.LocalDate
 
 // ---------- Warenkorb ----------
 
@@ -96,9 +97,21 @@ fun <T> List<T>.teilmengeVerschieben(gehoertDazu: (T) -> Boolean, von: Int, nach
 
 fun Veranstaltung.letzteBestellung(): Bestellung? = bestellungen.maxByOrNull { it.zeit }
 
-fun Veranstaltung.abschlussBerechnen(abschlussId: String, geraet: String, vereinName: String, zeit: Long): Abschluss {
-    val gueltig = bestellungen.filter { !it.storniert }
-    val storniert = bestellungen.filter { it.storniert }
+fun Veranstaltung.abschlussBerechnen(abschlussId: String, geraet: String, vereinName: String, zeit: Long): Abschluss =
+    bestellungen.abschluss(abschlussId, geraet, vereinName, name, zeit, anfangsbestandCent, istBestandCent)
+
+/** Berechnet einen Abschluss aus einer Liste von Bestellungen (die Bestellungen werden mitgeliefert). */
+fun List<Bestellung>.abschluss(
+    abschlussId: String,
+    geraet: String,
+    vereinName: String,
+    veranstaltungName: String,
+    zeit: Long,
+    anfangsbestandCent: Long = 0,
+    istBestandCent: Long? = null,
+): Abschluss {
+    val gueltig = filter { !it.storniert }
+    val storniert = filter { it.storniert }
     val positionen = gueltig.flatMap { it.positionen }
 
     val artikel = positionen.filter { !it.pfandRueckgabe }
@@ -116,7 +129,7 @@ fun Veranstaltung.abschlussBerechnen(abschlussId: String, geraet: String, verein
         id = abschlussId,
         geraet = geraet,
         vereinName = vereinName,
-        veranstaltungName = name,
+        veranstaltungName = veranstaltungName,
         erstelltAm = zeit,
         artikel = artikel,
         anzahlBestellungen = gueltig.size,
@@ -126,7 +139,16 @@ fun Veranstaltung.abschlussBerechnen(abschlussId: String, geraet: String, verein
         pfandAusCent = -positionen.filter { it.pfandCent < 0 }.sumOf { it.menge * it.pfandCent },
         anfangsbestandCent = anfangsbestandCent,
         istBestandCent = istBestandCent,
+        enthaeltBestellungen = true,
+        bestellungen = this,
     )
+}
+
+/** Abschluss eines anderen Geräts auf einen Festtag einschränken (null = geht nicht, alte Version ohne Uhrzeiten). */
+fun Abschluss.amTag(tag: LocalDate?): Abschluss? = when {
+    tag == null -> this
+    !enthaeltBestellungen -> null
+    else -> bestellungen.amTag(tag).abschluss(id, geraet, vereinName, veranstaltungName, erstelltAm)
 }
 
 /** Fasst Abschlüsse mehrerer Geräte zu einem Gesamtergebnis zusammen. */

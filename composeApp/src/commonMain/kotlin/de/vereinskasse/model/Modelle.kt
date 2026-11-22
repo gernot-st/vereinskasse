@@ -109,6 +109,9 @@ data class Abschluss(
     val pfandAusCent: Long,
     val anfangsbestandCent: Long,
     val istBestandCent: Long? = null,
+    /** Ab Version 1.1: alle Bestellungen mit Uhrzeit (für Tagesauswahl und Verlauf). */
+    val enthaeltBestellungen: Boolean = false,
+    val bestellungen: List<Bestellung> = emptyList(),
 ) {
     val artikelUmsatzCent: Long get() = artikel.sumOf { it.umsatzCent }
     val kassenEinnahmeCent: Long get() = artikelUmsatzCent + pfandEinCent - pfandAusCent

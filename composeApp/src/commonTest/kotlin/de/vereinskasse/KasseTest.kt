@@ -162,3 +162,63 @@ class KasseTest {
         assertEquals(AppDaten(geraetename = "A"), appDatenAusJson("{\"geraetename\":\"A\",\"neu\":1}"))
     }
 }
+
+class VerlaufTest {
+    private val zone = kotlinx.datetime.TimeZone.UTC
+    // 13.06.2026 18:00 UTC
+    private val basis = 1_781_373_600_000L
+    private fun pos(name: String, menge: Int, helfer: Boolean = false) =
+        Position(name = name, menge = menge, einzelpreisCent = 100, helfer = helfer)
+
+    @Test
+    fun festtagWechseltUmSechs() {
+        val sa = festtag(basis, zone)
+        assertEquals(kotlinx.datetime.LocalDate(2026, 6, 13), sa)
+        // 1:30 Uhr nachts zählt noch zum Samstag
+        assertEquals(sa, festtag(basis + (7 * 60 + 30) * 60_000L, zone))
+        // 6:10 Uhr ist der nächste Tag
+        assertEquals(kotlinx.datetime.LocalDate(2026, 6, 14), festtag(basis + (12 * 60 + 10) * 60_000L, zone))
+        assertEquals("Sa 13.06.", tagText(sa))
+    }
+
+    @Test
+    fun verlaufProViertelstunde() {
+        val bestellungen = listOf(
+            Bestellung("1", basis + 60_000, listOf(pos("Bier", 2), pos("Wurst", 1))),
+            Bestellung("2", basis + 14 * 60_000, listOf(pos("Bier", 1, helfer = true))),
+            Bestellung("3", basis + 31 * 60_000, listOf(pos("Bier", 3))),
+            Bestellung("4", basis + 32 * 60_000, listOf(pos("Bier", 5)), storniert = true),
+            // nächster Tag, große Lücke
+            Bestellung("5", basis + 20 * 3_600_000L, listOf(pos("Wurst", 4))),
+        )
+        val v = bestellungen.verlauf(mitHelfer = true)
+        // 18:00, 18:15 (leer), 18:30, Lücke, 14:00 am Folgetag
+        assertEquals(5, v.anzahl)
+        assertEquals(null, v.zeitpunkte[3])
+        assertEquals(listOf(3, 0, 3, 0, 0), v.mengen["Bier"])
+        assertEquals(listOf(3, 3, 6, 6, 6), v.kumuliert("Bier"))
+        assertEquals(5, v.gesamt("Wurst"))
+
+        val ohneHelfer = bestellungen.verlauf(mitHelfer = false)
+        assertEquals(5, ohneHelfer.gesamt("Bier"))
+
+        assertEquals(2, bestellungen.festtage(zone).size)
+        assertEquals(4, bestellungen.amTag(kotlinx.datetime.LocalDate(2026, 6, 13), zone).size)
+    }
+
+    @Test
+    fun abschlussMitBestellungenAmTag() {
+        val bestellungen = listOf(
+            Bestellung("1", basis, listOf(pos("Bier", 2))),
+            Bestellung("2", basis + 20 * 3_600_000L, listOf(pos("Bier", 4))),
+        )
+        val a = bestellungen.abschluss("x", "Kasse 2", "TSV", "Fest", 0)
+        val export = importLesen(a.export())
+        assertIs<ImportErgebnis.AbschlussDatei>(export)
+        assertEquals(2, export.abschluss.bestellungen.size)
+        val tag = festtag(basis + 20 * 3_600_000L)
+        assertEquals(4, export.abschluss.amTag(tag)!!.artikel.single().menge)
+        // Alte Abschlüsse ohne Bestellungen können nicht nach Tag gefiltert werden
+        assertNull(a.copy(enthaeltBestellungen = false).amTag(tag))
+    }
+}

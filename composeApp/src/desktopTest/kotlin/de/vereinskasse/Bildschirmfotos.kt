@@ -13,11 +13,20 @@ import de.vereinskasse.logik.konfigExport
 import de.vereinskasse.logik.pfandRueckgabeHinzufuegen
 import de.vereinskasse.model.*
 import de.vereinskasse.ui.App
+import de.vereinskasse.ui.AuswertungSeite
+import de.vereinskasse.ui.DiagrammArt
+import de.vereinskasse.ui.VerlaufAbschnitt
+import de.vereinskasse.logik.abschluss
+import de.vereinskasse.logik.amTag
+import de.vereinskasse.logik.tagText
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import de.vereinskasse.ui.BezahlenInhalt
 import de.vereinskasse.ui.KassenZustand
 import de.vereinskasse.ui.Seite
 import de.vereinskasse.ui.VereinskasseTheme
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.coroutines.Dispatchers
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -33,6 +42,7 @@ class Bildschirmfotos {
     private val plattform = object : Plattform {
         override fun teileText(text: String) {}
         override fun teileDatei(dateiname: String, inhalt: String) {}
+        override fun teileBild(dateiname: String, bild: androidx.compose.ui.graphics.ImageBitmap) {}
         override fun dateiOeffnen() {}
     }
 
@@ -132,6 +142,77 @@ class Bildschirmfotos {
             App(store(), plattform, null, {}, startSeiten = listOf(Seite.Kasse, Seite.VereinBearbeiten("ver1")))
         }
         foto("07_vereine", 412, 892) { App(store(), plattform, null, {}, startSeiten = listOf(Seite.Kasse, Seite.Vereine)) }
+    }
+
+    /** Zwei Festtage: Sa 14:00–01:30, So 11:00–18:00, mit Spitzen am Abend bzw. Mittag. */
+    private fun festBestellungen(seed: Int, nurEssen: Boolean = false): List<Bestellung> {
+        val zufall = kotlin.random.Random(seed)
+        val zone = kotlinx.datetime.TimeZone.currentSystemDefault()
+        fun zeit(tag: Int, stunde: Double): Long =
+            kotlinx.datetime.LocalDate(2026, 6, tag).atStartOfDayIn(zone).toEpochMilliseconds() + (stunde * 3_600_000).toLong()
+        val ergebnis = mutableListOf<Bestellung>()
+        var id = 0
+        fun tagErzeugen(tag: Int, von: Double, bis: Double, spitze: Double, anzahl: Int) {
+            repeat(anzahl) {
+                // Dreiecksverteilung um die Spitze
+                val u = zufall.nextDouble()
+                val c = (spitze - von) / (bis - von)
+                val x = if (u < c) von + kotlin.math.sqrt(u * (bis - von) * (spitze - von))
+                else bis - kotlin.math.sqrt((1 - u) * (bis - von) * (bis - spitze))
+                var korb = emptyList<Position>()
+                val auswahl = if (nurEssen) artikel.filter { it.gruppeId == "g2" } else artikel.filter { it.sichtbar && it.gruppeId != "g2" }
+                repeat(1 + zufall.nextInt(3)) {
+                    val a = auswahl[minOf(zufall.nextInt(auswahl.size), zufall.nextInt(auswahl.size))]
+                    val nachmittag = x < 17.5 && a.gruppeId == "g3"
+                    if (a.gruppeId != "g3" || nachmittag || zufall.nextInt(5) == 0) {
+                        korb = korb.artikelHinzufuegen(a, helfer = zufall.nextInt(15) == 0, mitPfand = true)
+                    }
+                }
+                if (korb.isNotEmpty()) ergebnis += Bestellung("${seed}_${id++}", zeit(tag, x), korb, storniert = zufall.nextInt(60) == 0)
+            }
+        }
+        tagErzeugen(13, 14.0, 25.5, 21.0, 260)
+        tagErzeugen(14, 11.0, 18.0, 13.0, 140)
+        return ergebnis.sortedBy { it.zeit }
+    }
+
+    private fun festDaten(): AppDaten {
+        val essen = festBestellungen(2, nurEssen = true)
+        val v = Veranstaltung(
+            "v1", "Sommerfest 2026", 0, anfangsbestandCent = 15000,
+            bestellungen = festBestellungen(1),
+            fremdAbschluesse = listOf(essen.abschluss("fremd", "Essens-Kasse", "TSV Musterdorf", "Sommerfest 2026", 0)),
+        )
+        val verein = Verein("ver1", "TSV Musterdorf", listOf(getraenke, this.essen, kuchen), artikel, listOf(v), "v1")
+        return AppDaten(listOf(verein), "ver1", "Getränke-Kasse", "geraet1")
+    }
+
+    @Test
+    fun verlauf() {
+        val s = store(festDaten())
+        val v = s.aktiveVeranstaltung!!
+        val samstag = kotlinx.datetime.LocalDate(2026, 6, 13)
+        val alle = (v.bestellungen + v.fremdAbschluesse.flatMap { it.bestellungen })
+        fun abschnitt(name: String, tag: kotlinx.datetime.LocalDate?, art: DiagrammArt, gewaehlt: Int?, breite: Int = 412) =
+            foto(name, breite, 1000) {
+                VereinskasseTheme {
+                    androidx.compose.material3.Surface {
+                        androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(16.dp)) {
+                            VerlaufAbschnitt(
+                                s.aktiverVerein!!, "Sommerfest 2026" + (tag?.let { " · " + tagText(it) } ?: ""),
+                                alle.amTag(tag), true, emptyList(), plattform, art, gewaehlt,
+                            )
+                        }
+                    }
+                }
+            }
+        abschnitt("11_verlauf_hochlauf_samstag", samstag, DiagrammArt.HOCHLAUF, null)
+        abschnitt("12_verlauf_balken_samstag", samstag, DiagrammArt.BALKEN, 28)
+        abschnitt("13_verlauf_hochlauf_alle_tage", null, DiagrammArt.HOCHLAUF, 20)
+        abschnitt("14_verlauf_tablet", samstag, DiagrammArt.HOCHLAUF, null, breite = 900)
+        foto("15_auswertung_tag", 412, 1400) {
+            VereinskasseTheme { AuswertungSeite(s, plattform, {}, startTag = samstag) }
+        }
     }
 
     @Test

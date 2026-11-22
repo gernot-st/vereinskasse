@@ -25,6 +25,9 @@ interface Plattform {
     /** Datei mit Inhalt teilen (z. B. per WhatsApp). */
     fun teileDatei(dateiname: String, inhalt: String)
 
+    /** Bild (z. B. Diagramm) als PNG teilen. */
+    fun teileBild(dateiname: String, bild: androidx.compose.ui.graphics.ImageBitmap)
+
     /** Dateiauswahl öffnen; der Inhalt kommt über den Import-Weg der App zurück. */
     fun dateiOeffnen()
 }

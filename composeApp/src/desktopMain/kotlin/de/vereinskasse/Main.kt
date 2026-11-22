@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -43,6 +44,11 @@ fun main() = application {
                 val ziel = File(System.getProperty("user.home"), dateiname)
                 ziel.writeText(inhalt)
                 println("Datei gespeichert: $ziel")
+            }
+            override fun teileBild(dateiname: String, bild: androidx.compose.ui.graphics.ImageBitmap) {
+                val ziel = File(System.getProperty("user.home"), dateiname)
+                javax.imageio.ImageIO.write(bild.toAwtImage(), "png", ziel)
+                println("Bild gespeichert: $ziel")
             }
             override fun dateiOeffnen() {
                 val auswahl = JFileChooser()

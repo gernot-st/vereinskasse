@@ -49,7 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import de.vereinskasse.logik.KassenStore
 import de.vereinskasse.logik.Plattform
+import de.vereinskasse.logik.abschluss
 import de.vereinskasse.logik.abschlussBerechnen
+import de.vereinskasse.logik.amTag
+import de.vereinskasse.logik.festtage
+import de.vereinskasse.logik.tagText
+import kotlinx.datetime.LocalDate
 import de.vereinskasse.logik.alsText
 import de.vereinskasse.logik.dateiname
 import de.vereinskasse.logik.datumZeit
@@ -69,23 +74,34 @@ fun eigeneAbschlussId(veranstaltung: Veranstaltung, geraeteId: String) = "${vera
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Unit) {
+fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Unit, startTag: LocalDate? = null) {
     val verein = store.aktiverVerein
     var gewaehlteId by remember { mutableStateOf(verein?.aktiveVeranstaltungId) }
     val veranstaltung = verein?.veranstaltungen?.firstOrNull { it.id == gewaehlteId }
         ?: verein?.veranstaltungen?.maxByOrNull { it.erstelltAm }
     var teilenMenue by remember { mutableStateOf(false) }
     var fremdLoeschen by remember { mutableStateOf<Abschluss?>(null) }
+    // null = alle Tage
+    var tag by remember(veranstaltung?.id) { mutableStateOf(startTag) }
 
-    val eigener = if (verein != null && veranstaltung != null) {
+    // Vollständiger eigener Abschluss (für die Abschluss-Datei immer alle Tage)
+    val eigenerVoll = if (verein != null && veranstaltung != null) {
         veranstaltung.abschlussBerechnen(
             eigeneAbschlussId(veranstaltung, store.daten.geraeteId),
             store.daten.geraetename, verein.name, jetzt(),
         )
     } else null
-    val gesamt = if (eigener != null && veranstaltung != null && veranstaltung.fremdAbschluesse.isNotEmpty()) {
-        (listOf(eigener) + veranstaltung.fremdAbschluesse).zusammenfuehren("Alle Geräte", eigener.vereinName, eigener.veranstaltungName, jetzt())
+    val tage = veranstaltung?.let { v -> (v.bestellungen + v.fremdAbschluesse.flatMap { it.bestellungen }).festtage() } ?: emptyList()
+    if (tag != null && tag !in tage) tag = null
+    val eigener = if (tag == null || veranstaltung == null) eigenerVoll else eigenerVoll?.let {
+        veranstaltung.bestellungen.amTag(tag).abschluss(it.id, it.geraet, it.vereinName, it.veranstaltungName, it.erstelltAm)
+    }
+    val fremdeAmTag = veranstaltung?.fremdAbschluesse?.mapNotNull { it.amTag(tag) } ?: emptyList()
+    val fremdeOhneZeit = veranstaltung?.fremdAbschluesse?.filter { !it.enthaeltBestellungen } ?: emptyList()
+    val gesamt = if (eigener != null && fremdeAmTag.isNotEmpty()) {
+        (listOf(eigener) + fremdeAmTag).zusammenfuehren("Alle Geräte", eigener.vereinName, eigener.veranstaltungName, jetzt())
     } else null
+    val tagTitel = tag?.let { " · ${tagText(it)}" } ?: ""
 
     Scaffold(
         topBar = {
@@ -93,7 +109,7 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                 title = { Text("Auswertung") },
                 navigationIcon = { IconButton(onClick = zurueck) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
                 actions = {
-                    if (eigener != null) {
+                    if (eigener != null && eigenerVoll != null) {
                         Box {
                             IconButton(onClick = { teilenMenue = true }) { Icon(Icons.Default.Share, "Teilen") }
                             DropdownMenu(expanded = teilenMenue, onDismissRequest = { teilenMenue = false }) {
@@ -101,7 +117,7 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                                     text = { Text("Als Text teilen (WhatsApp)") },
                                     onClick = {
                                         teilenMenue = false
-                                        plattform.teileText(auswertungsText(eigener, gesamt, verein))
+                                        plattform.teileText(auswertungsText(eigener, gesamt, verein, tag))
                                     },
                                 )
                                 DropdownMenuItem(
@@ -109,8 +125,8 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                                     onClick = {
                                         teilenMenue = false
                                         plattform.teileDatei(
-                                            dateiname("${eigener.veranstaltungName}_${eigener.geraet}", "Abschluss"),
-                                            eigener.export(),
+                                            dateiname("${eigenerVoll.veranstaltungName}_${eigenerVoll.geraet}", "Abschluss"),
+                                            eigenerVoll.export(),
                                         )
                                     },
                                 )
@@ -141,16 +157,53 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                     }
                 }
             }
+            if (tage.size > 1) {
+                item {
+                    Column(Modifier.widthIn(max = 640.dp).fillMaxWidth()) {
+                        Text("Tag", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                FilterChip(selected = tag == null, onClick = { tag = null }, label = { Text("Alle Tage") })
+                            }
+                            items(tage) { t ->
+                                FilterChip(selected = tag == t, onClick = { tag = t }, label = { Text(tagText(t)) })
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 Column(Modifier.widthIn(max = 640.dp)) {
                     Text(
-                        "${veranstaltung.name} · ${store.daten.geraetename}",
+                        "${veranstaltung.name}$tagTitel · ${store.daten.geraetename}",
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(top = 12.dp),
                     )
                     Ueberblick(eigener)
-                    Kassenstand(store, verein, veranstaltung, eigener)
+                    if (tag == null) {
+                        Kassenstand(store, verein, veranstaltung, eigener)
+                    } else {
+                        Abschnitt("Kassenstand") {
+                            Text(
+                                "Der Kassenstand gilt für die ganze Veranstaltung – unter „Alle Tage“ eintragen.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     ArtikelTabelle("Verkaufte Artikel", eigener, verein)
+                }
+            }
+            item {
+                Column(Modifier.widthIn(max = 640.dp)) {
+                    VerlaufAbschnitt(
+                        verein = verein,
+                        titel = "${veranstaltung.name}$tagTitel",
+                        bestellungen = (veranstaltung.bestellungen + veranstaltung.fremdAbschluesse.flatMap { it.bestellungen }).amTag(tag),
+                        mehrereGeraete = veranstaltung.fremdAbschluesse.any { it.enthaeltBestellungen },
+                        fehlendeGeraete = fremdeOhneZeit.map { it.geraet },
+                        plattform = plattform,
+                    )
                 }
             }
             item {
@@ -171,8 +224,15 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                                             "Stand ${datumZeit(f.erstelltAm)} · ${f.anzahlBestellungen} Bestellungen",
                                             style = MaterialTheme.typography.bodySmall,
                                         )
+                                        if (!f.enthaeltBestellungen) {
+                                            Text(
+                                                "Ältere App-Version ohne Uhrzeiten – fehlt in Tagesauswahl und Verlauf. Bitte neu schicken lassen.",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
                                     }
-                                    Text(geld(f.kassenEinnahmeCent), style = MaterialTheme.typography.titleSmall)
+                                    Text(geld((f.amTag(tag) ?: f).kassenEinnahmeCent), style = MaterialTheme.typography.titleSmall)
                                     IconButton(onClick = { fremdLoeschen = f }) { Icon(Icons.Default.Delete, "Entfernen") }
                                 }
                             }
@@ -182,7 +242,7 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                         }
                     }
                     if (gesamt != null) {
-                        Abschnitt("Gesamt aller Geräte (${veranstaltung.fremdAbschluesse.size + 1})") {
+                        Abschnitt("Gesamt aller Geräte (${fremdeAmTag.size + 1})$tagTitel") {
                             WertZeile("Einnahmen gesamt", geld(gesamt.kassenEinnahmeCent), hervorheben = true)
                             WertZeile("davon Umsatz Artikel", geld(gesamt.artikelUmsatzCent))
                             if (gesamt.pfandEinCent != 0L || gesamt.pfandAusCent != 0L) {
@@ -192,9 +252,9 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                         }
                         ArtikelTabelle("Artikel aller Geräte", gesamt, verein)
                     }
-                    Bestellliste(veranstaltung)
+                    Bestellliste(veranstaltung.copy(bestellungen = veranstaltung.bestellungen.amTag(tag)))
                     Button(
-                        onClick = { plattform.teileText(auswertungsText(eigener, gesamt, verein)) },
+                        onClick = { plattform.teileText(auswertungsText(eigener, gesamt, verein, tag)) },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                     ) {
                         Icon(Icons.Default.Share, null)
@@ -224,10 +284,13 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
     }
 }
 
-private fun auswertungsText(eigener: Abschluss, gesamt: Abschluss?, verein: Verein?): String =
-    if (gesamt == null) eigener.alsText("Abschluss ${eigener.geraet}", mitKassenstand = true, verein = verein)
-    else gesamt.alsText("Abschluss aller Geräte", mitKassenstand = false, verein = verein) + "\n\n" +
-        eigener.alsText("Davon ${eigener.geraet}", mitKassenstand = true, verein = verein)
+private fun auswertungsText(eigener: Abschluss, gesamt: Abschluss?, verein: Verein?, tag: LocalDate?): String {
+    val zusatz = tag?.let { " – ${tagText(it)}" } ?: ""
+    val mitKasse = tag == null
+    return if (gesamt == null) eigener.alsText("Abschluss ${eigener.geraet}$zusatz", mitKassenstand = mitKasse, verein = verein)
+    else gesamt.alsText("Abschluss aller Geräte$zusatz", mitKassenstand = false, verein = verein) + "\n\n" +
+        eigener.alsText("Davon ${eigener.geraet}$zusatz", mitKassenstand = mitKasse, verein = verein)
+}
 
 @Composable
 private fun Ueberblick(a: Abschluss) {
