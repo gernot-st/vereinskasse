@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.content.FileProvider
+import de.vereinskasse.logik.ImportDatei
 import de.vereinskasse.logik.KassenStore
 import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.Speicher
@@ -63,7 +65,7 @@ object AppZustand {
 
 class MainActivity : ComponentActivity(), Plattform {
 
-    private var importText by mutableStateOf<String?>(null)
+    private var importDatei by mutableStateOf<ImportDatei?>(null)
 
     private val dateiAuswahl = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) uriLesen(uri)
@@ -79,8 +81,8 @@ class MainActivity : ComponentActivity(), Plattform {
             App(
                 store = store,
                 plattform = this,
-                importText = importText,
-                importErledigt = { importText = null },
+                importDatei = importDatei,
+                importErledigt = { importDatei = null },
                 zurueckHandler = { aktiv, onZurueck -> BackHandler(enabled = aktiv, onBack = onZurueck) },
             )
         }
@@ -109,7 +111,8 @@ class MainActivity : ComponentActivity(), Plattform {
                 }
                 when {
                     uri != null -> uriLesen(uri)
-                    intent.getStringExtra(Intent.EXTRA_TEXT) != null -> importText = intent.getStringExtra(Intent.EXTRA_TEXT)
+                    intent.getStringExtra(Intent.EXTRA_TEXT) != null ->
+                        importDatei = ImportDatei(null, intent.getStringExtra(Intent.EXTRA_TEXT)!!.encodeToByteArray())
                 }
             }
         }
@@ -117,12 +120,17 @@ class MainActivity : ComponentActivity(), Plattform {
 
     private fun uriLesen(uri: Uri) {
         try {
-            val text = contentResolver.openInputStream(uri)?.use { stream ->
-                val bytes = stream.readBytes()
-                require(bytes.size < 20_000_000) { "Datei zu groß" }
-                bytes.toString(Charsets.UTF_8)
+            val bytes = contentResolver.openInputStream(uri)?.use { stream ->
+                stream.readBytes().also { require(it.size < 20_000_000) { "Datei zu groß" } }
             }
-            if (text != null) importText = text
+            val name = try {
+                contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0) else null
+                }
+            } catch (_: Exception) {
+                null
+            } ?: uri.lastPathSegment
+            if (bytes != null) importDatei = ImportDatei(name, bytes)
         } catch (e: Exception) {
             Toast.makeText(this, "Datei konnte nicht gelesen werden: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -138,14 +146,14 @@ class MainActivity : ComponentActivity(), Plattform {
         startActivity(Intent.createChooser(intent, "Auswertung teilen"))
     }
 
-    override fun teileDatei(dateiname: String, inhalt: String) {
+    override fun teileDatei(dateiname: String, inhalt: String, mimeType: String) {
         try {
             val ordner = File(cacheDir, "export").apply { mkdirs() }
             ordner.listFiles()?.forEach { it.delete() }
             val datei = File(ordner, dateiname).apply { writeText(inhalt) }
             val uri = FileProvider.getUriForFile(this, "$packageName.dateien", datei)
             val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/json"
+                type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
                 putExtra(Intent.EXTRA_SUBJECT, dateiname)
                 clipData = ClipData.newRawUri(dateiname, uri)

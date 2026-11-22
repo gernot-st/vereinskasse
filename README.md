@@ -24,6 +24,11 @@ Keine Rechnungen, kein Finanzamt, keine Cloud: Alle Daten bleiben auf dem Gerät
   - Mehrere Kassen zusammenführen (Abschluss-Datei von anderen Geräten importieren).
     Ab Version 1.1 enthält die Datei alle Bestellungen mit Uhrzeit, damit Tagesauswahl und Verlauf
     auch die anderen Kassen umfassen.
+- **Artikel als CSV für Excel** exportieren und importieren (im Verein über ⋮):
+  eine Zeile pro Artikel mit den Spalten `Gruppe;Artikel;Preis;Pfand;Sichtbar;Farbe`.
+  Reihenfolge der Zeilen = Reihenfolge an der Kasse. Der Import erkennt Strichpunkt/Komma/Tab,
+  UTF-8 und Windows-Kodierung, zeigt fehlerhafte Zeilen mit Zeilennummer und fragt: ergänzen oder ersetzen.
+  Farben als Name (blau, rot, grün, orange, lila, türkis, gelb, braun, pink, grau, indigo, hellgrün) oder `#RRGGBB`.
 - **Konfiguration per WhatsApp** exportieren und importieren – beim Import wird gefragt:
   ergänzen, ersetzen oder als neuen Verein anlegen
 

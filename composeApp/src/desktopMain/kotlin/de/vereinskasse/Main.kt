@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import de.vereinskasse.logik.ImportDatei
 import de.vereinskasse.logik.KassenStore
 import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.Speicher
@@ -36,11 +37,11 @@ class DateiSpeicher(private val datei: File) : Speicher {
 fun main() = application {
     val scope = rememberCoroutineScope()
     val store = remember { KassenStore(DateiSpeicher(File(System.getProperty("user.home"), ".vereinskasse/daten.json")), scope) }
-    var importText by remember { mutableStateOf<String?>(null) }
+    var importDatei by remember { mutableStateOf<ImportDatei?>(null) }
     val plattform = remember {
         object : Plattform {
             override fun teileText(text: String) = println("---- Teilen ----\n$text")
-            override fun teileDatei(dateiname: String, inhalt: String) {
+            override fun teileDatei(dateiname: String, inhalt: String, mimeType: String) {
                 val ziel = File(System.getProperty("user.home"), dateiname)
                 ziel.writeText(inhalt)
                 println("Datei gespeichert: $ziel")
@@ -53,7 +54,7 @@ fun main() = application {
             override fun dateiOeffnen() {
                 val auswahl = JFileChooser()
                 if (auswahl.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                    importText = auswahl.selectedFile.readText()
+                    importDatei = ImportDatei(auswahl.selectedFile.name, auswahl.selectedFile.readBytes())
                 }
             }
         }
@@ -63,6 +64,6 @@ fun main() = application {
         title = "Vereinskasse",
         state = rememberWindowState(width = 420.dp, height = 820.dp),
     ) {
-        App(store, plattform, importText, importErledigt = { importText = null })
+        App(store, plattform, importDatei, importErledigt = { importDatei = null })
     }
 }

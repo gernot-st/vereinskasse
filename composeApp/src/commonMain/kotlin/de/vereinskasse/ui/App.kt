@@ -17,7 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.vereinskasse.logik.ImportArt
+import de.vereinskasse.logik.ImportDatei
 import de.vereinskasse.logik.ImportErgebnis
+import de.vereinskasse.logik.textDekodieren
 import de.vereinskasse.logik.KassenStore
 import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.abschlussImportieren
@@ -42,7 +44,7 @@ typealias ZurueckHandler = @Composable (aktiv: Boolean, onZurueck: () -> Unit) -
 fun App(
     store: KassenStore,
     plattform: Plattform,
-    importText: String?,
+    importDatei: ImportDatei?,
     importErledigt: () -> Unit,
     zurueckHandler: ZurueckHandler = { _, _ -> },
     startSeiten: List<Seite>? = null,
@@ -72,8 +74,9 @@ fun App(
             Seite.Auswertung -> AuswertungSeite(store, plattform, zurueck)
         }
 
-        if (importText != null) {
-            ImportDialog(store, importText, importErledigt, nachKonfigImport = {
+        if (importDatei != null) {
+            val zielVerein = (stapel.last() as? Seite.VereinBearbeiten)?.vereinId ?: store.daten.aktiverVereinId
+            ImportDialog(store, importDatei, zielVerein, importErledigt, nachKonfigImport = {
                 if (stapel.last() == Seite.Vereine && stapel.size == 1) zurKasse()
             })
         }
@@ -85,7 +88,19 @@ fun App(
 }
 
 @Composable
-private fun ImportDialog(store: KassenStore, text: String, fertig: () -> Unit, nachKonfigImport: () -> Unit) {
+private fun ImportDialog(
+    store: KassenStore,
+    datei: ImportDatei,
+    zielVereinId: String?,
+    fertig: () -> Unit,
+    nachKonfigImport: () -> Unit,
+) {
+    val text = remember(datei) { textDekodieren(datei.bytes) }
+    val istJson = text.trimStart().startsWith("{") || datei.name?.endsWith(".json", ignoreCase = true) == true
+    if (!istJson) {
+        CsvImportDialog(store, text, datei.name, zielVereinId, fertig, nachKonfigImport)
+        return
+    }
     val ergebnis = remember(text) { importLesen(text) }
     when (ergebnis) {
         is ImportErgebnis.Fehler -> HinweisDialog("Import nicht möglich", ergebnis.meldung, fertig)

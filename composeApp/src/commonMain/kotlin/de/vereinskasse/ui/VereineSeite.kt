@@ -128,7 +128,9 @@ fun VereineSeite(
                             "Es wird eine Datei mit allen Gruppen und Artikeln (ohne Umsätze) verschickt.\n" +
                             "• Importieren: Die Datei in WhatsApp antippen und mit „Vereinskasse“ öffnen – " +
                             "oder die Datei speichern und hier auf „Importieren“ tippen.\n" +
-                            "• Gibt es den Verein schon, fragt die App, ob ersetzt oder ergänzt werden soll.",
+                            "• Gibt es den Verein schon, fragt die App, ob ersetzt oder ergänzt werden soll.\n" +
+                            "• Excel: Im Verein über ⋮ → „Als CSV exportieren“ bzw. „CSV importieren“. " +
+                            "Spalten: Gruppe; Artikel; Preis; Pfand; Sichtbar; Farbe. „Importieren“ hier erkennt CSV-Dateien ebenfalls.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

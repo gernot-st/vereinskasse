@@ -17,13 +17,16 @@ interface Speicher {
     fun speichern(inhalt: String)
 }
 
+/** Eine zu importierende Datei (aus WhatsApp, Dateiauswahl …). */
+class ImportDatei(val name: String?, val bytes: ByteArray)
+
 /** Plattformabhängige Funktionen (Teilen, Datei öffnen). */
 interface Plattform {
     /** Text teilen (z. B. per WhatsApp). */
     fun teileText(text: String)
 
     /** Datei mit Inhalt teilen (z. B. per WhatsApp). */
-    fun teileDatei(dateiname: String, inhalt: String)
+    fun teileDatei(dateiname: String, inhalt: String, mimeType: String = "application/json")
 
     /** Bild (z. B. Diagramm) als PNG teilen. */
     fun teileBild(dateiname: String, bild: androidx.compose.ui.graphics.ImageBitmap)

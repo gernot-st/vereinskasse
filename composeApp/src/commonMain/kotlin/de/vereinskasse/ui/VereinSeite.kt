@@ -56,6 +56,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.vereinskasse.logik.GRUPPEN_FARBEN
 import de.vereinskasse.logik.KassenStore
+import de.vereinskasse.logik.alsCsv
+import de.vereinskasse.logik.csvVorlage
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.dateiname
 import de.vereinskasse.logik.datum
@@ -93,6 +99,7 @@ fun VereinSeite(
     }
     var reiter by remember { mutableStateOf(Reiter.entries[startReiter]) }
     var umbenennen by remember { mutableStateOf(false) }
+    var menueOffen by remember { mutableStateOf(false) }
     // Dialog-Zustände: null = zu, Objekt mit leerer id = neu
     var artikelDialog by remember { mutableStateOf<Artikel?>(null) }
     var gruppeDialog by remember { mutableStateOf<Gruppe?>(null) }
@@ -107,9 +114,38 @@ fun VereinSeite(
                 navigationIcon = { IconButton(onClick = zurueck) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zurück") } },
                 actions = {
                     IconButton(onClick = { umbenennen = true }) { Icon(Icons.Default.Edit, "Umbenennen") }
-                    IconButton(onClick = {
-                        plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport())
-                    }) { Icon(Icons.Default.Share, "Konfiguration teilen") }
+                    Box {
+                        IconButton(onClick = { menueOffen = true }) { Icon(Icons.Default.MoreVert, "Import und Export") }
+                        DropdownMenu(expanded = menueOffen, onDismissRequest = { menueOffen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Für andere Handys teilen") },
+                                leadingIcon = { Icon(Icons.Default.Share, null) },
+                                onClick = {
+                                    menueOffen = false
+                                    plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport())
+                                },
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Als CSV exportieren (Excel)") },
+                                onClick = {
+                                    menueOffen = false
+                                    plattform.teileDatei(dateiname(verein.name, "Artikel", "csv"), verein.alsCsv(), "text/csv")
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("CSV importieren") },
+                                onClick = { menueOffen = false; plattform.dateiOeffnen() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Leere CSV-Vorlage teilen") },
+                                onClick = {
+                                    menueOffen = false
+                                    plattform.teileDatei("Vereinskasse_Vorlage.csv", csvVorlage(), "text/csv")
+                                },
+                            )
+                        }
+                    }
                 },
             )
         },

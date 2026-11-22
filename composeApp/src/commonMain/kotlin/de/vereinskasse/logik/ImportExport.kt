@@ -33,9 +33,9 @@ fun Abschluss.export(): String = JSON_SCHOEN.encodeToString(
     ExportDatei(typ = ExportDatei.TYP_ABSCHLUSS, abschluss = this),
 )
 
-fun dateiname(name: String, endung: String): String {
+fun dateiname(name: String, zusatz: String, endung: String = "json"): String {
     val sauber = name.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("").trim('_').ifEmpty { "Verein" }
-    return "${sauber}_$endung.json"
+    return "${sauber}_$zusatz.$endung"
 }
 
 // ---------- Import ----------

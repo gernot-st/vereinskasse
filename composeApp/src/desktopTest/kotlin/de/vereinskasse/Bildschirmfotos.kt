@@ -41,7 +41,7 @@ class Bildschirmfotos {
 
     private val plattform = object : Plattform {
         override fun teileText(text: String) {}
-        override fun teileDatei(dateiname: String, inhalt: String) {}
+        override fun teileDatei(dateiname: String, inhalt: String, mimeType: String) {}
         override fun teileBild(dateiname: String, bild: androidx.compose.ui.graphics.ImageBitmap) {}
         override fun dateiOeffnen() {}
     }
@@ -219,7 +219,13 @@ class Bildschirmfotos {
     fun importFrage() {
         val s = store()
         val export = s.aktiverVerein!!.konfigExport()
-        foto("08_import", 412, 892) { App(s, plattform, export, {}) }
+        foto("08_import", 412, 892) { App(s, plattform, de.vereinskasse.logik.ImportDatei(null, export.encodeToByteArray()), {}) }
+        val csv = "Gruppe;Artikel;Preis;Pfand;Sichtbar;Farbe\r\nGetränke;Bier 0,5;3,80;2,00;ja;blau\r\nGetränke;Spezi;2,80;2,00;ja;blau\r\n" +
+            "Getränke;Limo;zwei;;;\r\nKuchen;Apfelkuchen;2,50;;vielleicht;rosa\r\n"
+        foto("16_csv_import", 412, 892) {
+            App(s, plattform, de.vereinskasse.logik.ImportDatei("TSV_Musterdorf_Artikel.csv", csv.encodeToByteArray()), {},
+                startSeiten = listOf(Seite.Kasse, Seite.VereinBearbeiten("ver1")))
+        }
     }
 
     @Test
