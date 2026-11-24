@@ -346,7 +346,7 @@ private fun ArtikelReiter(
         if (liste.isEmpty()) {
             Hinweis("Noch keine Artikel in dieser Gruppe. Tippe unten auf „+ Artikel“.")
         } else {
-            Hinweis("Zum Sortieren am ☰-Symbol ziehen. Schalter = an der Kasse sichtbar.")
+            Hinweis("Zum Sortieren am Griff links (drei Striche) ziehen. Schalter = an der Kasse sichtbar.")
         }
         LazyColumn(
             state = listState,
@@ -407,7 +407,7 @@ private fun GruppenReiter(store: KassenStore, verein: Verein, onBearbeiten: (Gru
     Column(Modifier.fillMaxSize()) {
         Hinweis(
             if (verein.gruppen.isEmpty()) "Noch keine Gruppen. Gruppen fassen Artikel zusammen (z. B. Getränke, Essen, Kuchen) und geben den Kacheln ihre Farbe."
-            else "Die Reihenfolge hier bestimmt die Reihenfolge an der Kasse. Zum Sortieren am ☰-Symbol ziehen."
+            else "Die Reihenfolge hier bestimmt die Reihenfolge an der Kasse. Zum Sortieren am Griff links (drei Striche) ziehen."
         )
         LazyColumn(
             state = listState,

@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -14,6 +15,15 @@ kotlin {
     }
     // Desktop-Ziel: zum Entwickeln/Testen der Oberfläche ohne Handy.
     jvm("desktop")
+    // Web-App (PWA) für iPhone und Browser – läuft nach dem ersten Laden offline.
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        moduleName = "vereinskasse"
+        browser {
+            commonWebpackConfig { outputFileName = "vereinskasse.js" }
+        }
+        binaries.executable()
+    }
     // iOS kann später ergänzt werden (iosArm64(), iosSimulatorArm64()) – siehe README.
 
     sourceSets {
@@ -97,5 +107,30 @@ android {
 compose.desktop {
     application {
         mainClass = "de.vereinskasse.MainKt"
+    }
+}
+
+// Fertige Web-App: Distribution + Service Worker mit Dateiliste und Version (für den Offline-Betrieb)
+val webApp by tasks.registering {
+    group = "build"
+    description = "Baut die Web-App (PWA) nach build/dist/wasmJs/productionExecutable"
+    dependsOn("wasmJsBrowserDistribution")
+    val ordner = layout.buildDirectory.dir("dist/wasmJs/productionExecutable")
+    doLast {
+        val dir = ordner.get().asFile
+        dir.walkTopDown().filter { it.isFile && (it.name.endsWith(".map") || it.name.endsWith("LICENSE.txt")) }.forEach { it.delete() }
+        val dateien = dir.walkTopDown()
+            .filter { it.isFile && it.name != "sw.js" }
+            .map { it.relativeTo(dir).invariantSeparatorsPath }
+            .sorted()
+            .toList()
+        val version = System.getenv("VERSION_NAME") ?: ("dev-" + System.currentTimeMillis())
+        val sw = File(dir, "sw.js")
+        sw.writeText(
+            sw.readText()
+                .replace("__VERSION__", "vereinskasse-$version")
+                .replace("/*DATEIEN*/", (listOf("./") + dateien).joinToString(", ") { "\"$it\"" })
+        )
+        println("Web-App: ${dateien.size} Dateien, Version $version")
     }
 }

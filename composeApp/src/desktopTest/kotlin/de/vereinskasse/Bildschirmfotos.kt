@@ -116,6 +116,12 @@ class Bildschirmfotos {
         return s
     }
 
+    /** Beispieldaten für den Test der Web-App im Browser. */
+    @Test
+    fun beispieldatenFuerWeb() {
+        File("build/beispieldaten.json").writeText(with(de.vereinskasse.logik.JSON) { encodeToString(AppDaten.serializer(), festDaten()) })
+    }
+
     @Test
     fun design() {
         val s = storeMitDesign()

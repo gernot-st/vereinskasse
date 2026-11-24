@@ -212,7 +212,7 @@ fun AuswertungSeite(store: KassenStore, plattform: Plattform, zurueck: () -> Uni
                 Column(Modifier.widthIn(max = 640.dp)) {
                     Abschnitt("Mehrere Kassen zusammenführen") {
                         Text(
-                            "Auf den anderen Geräten unter Auswertung → Teilen → „Abschluss-Datei teilen“ wählen " +
+                            "Auf den anderen Geräten in der Auswertung über „Teilen“ die „Abschluss-Datei teilen“ wählen " +
                                 "und hierher schicken. Dann die Datei öffnen oder hier importieren.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

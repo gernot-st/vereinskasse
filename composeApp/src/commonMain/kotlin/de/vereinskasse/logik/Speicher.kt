@@ -24,6 +24,12 @@ class ImportDatei(val name: String?, val bytes: ByteArray)
 
 /** Plattformabhängige Funktionen (Teilen, Datei öffnen). */
 interface Plattform {
+    /** Hinweis zur Datensicherheit, falls die Plattform Daten verlieren kann (z. B. Browser). */
+    val speicherHinweis: String? get() = null
+
+    /** Können Dateien (z. B. aus WhatsApp) direkt mit der App geöffnet werden? */
+    val kannDateienDirektOeffnen: Boolean get() = true
+
     /** Text teilen (z. B. per WhatsApp). */
     fun teileText(text: String)
 

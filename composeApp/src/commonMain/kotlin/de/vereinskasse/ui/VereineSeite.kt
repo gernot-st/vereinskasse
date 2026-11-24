@@ -135,10 +135,12 @@ fun VereineSeite(
                         "• Exportieren: Beim Verein auf „Teilen“ tippen und WhatsApp wählen. " +
                             "Es wird eine Datei mit Gruppen, Artikeln und Veranstaltungen (ohne Umsätze) verschickt – " +
                             "so haben alle Kassen dieselbe Veranstaltung.\n" +
-                            "• Importieren: Die Datei in WhatsApp antippen und mit „Vereinskasse“ öffnen – " +
-                            "oder die Datei speichern und hier auf „Importieren“ tippen.\n" +
+                            (if (plattform.kannDateienDirektOeffnen) "• Importieren: Die Datei in WhatsApp antippen und mit „Vereinskasse“ öffnen – " +
+                                "oder die Datei speichern und hier auf „Importieren“ tippen.\n"
+                            else "• Importieren: Die Datei in WhatsApp antippen, über „Teilen“ in „Dateien“ sichern " +
+                                "und dann hier auf „Importieren“ tippen.\n") +
                             "• Gibt es den Verein schon, fragt die App, ob ersetzt oder ergänzt werden soll.\n" +
-                            "• Excel: Im Verein über ⋮ → „Als CSV exportieren“ bzw. „CSV importieren“. " +
+                            "• Excel: Im Verein über das Menü oben rechts (drei Punkte): „Als CSV exportieren“ bzw. „CSV importieren“. " +
                             "Spalten: Gruppe; Artikel; Preis; Pfand; Sichtbar; Farbe. „Importieren“ hier erkennt CSV-Dateien ebenfalls.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -154,6 +156,14 @@ fun VereineSeite(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    plattform.speicherHinweis?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     Text(
                         daten.letzteSicherung?.let { "Letzte Sicherung erstellt: ${datumZeit(it)}" } ?: "Noch keine Sicherung erstellt.",
                         style = MaterialTheme.typography.bodySmall,

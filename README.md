@@ -41,6 +41,23 @@ Keine Rechnungen, kein Finanzamt, keine Cloud: Alle Daten bleiben auf dem Gerät
 - **Datensicherung** (in der Vereinsliste): alle Daten des Geräts inkl. Bestellungen in eine Datei;
   Wiederherstellen ersetzt nach Rückfrage alle Daten (für Handywechsel oder Neuinstallation)
 
+## Web-App für iPhone (und jeden Browser)
+
+Dieselbe App läuft auch als Web-App: **https://gernot-st.github.io/vereinskasse/**
+
+**iPhone (ab iOS 18.2):**
+1. Link in **Safari** öffnen (einmal mit Internet).
+2. Teilen-Symbol → **„Zum Home-Bildschirm“**.
+3. Ab dann über das Symbol starten – die App läuft **komplett offline**. Updates kommen automatisch, sobald wieder Internet da ist.
+
+Unterschiede zur Android-App:
+- Die Daten liegen im Browser-Speicher. iOS kann ihn bei Speichermangel löschen –
+  **nach jeder Veranstaltung eine Datensicherung erstellen** (Vereinsliste → Datensicherung).
+- Dateien aus WhatsApp lassen sich nicht direkt öffnen: Datei in „Dateien“ sichern, dann in der App „Importieren“.
+- Teilen (WhatsApp usw.) läuft über das Teilen-Menü von iOS.
+
+Alle Dateien (Konfiguration, Abschluss, CSV, Sicherung) sind zwischen Android und Web austauschbar.
+
 ## App installieren
 
 1. Auf GitHub unter **Releases** die neueste `Vereinskasse-….apk` auf dem Handy herunterladen.
@@ -79,15 +96,17 @@ liegt in `composeApp/src/commonMain` und ist plattformunabhängig.
 | `commonMain/.../ui` | Alle Bildschirme |
 | `androidMain` | Android-Start, Speichern, Teilen, Datei öffnen |
 | `desktopMain` | Desktop-Version zum Ausprobieren am PC |
+| `wasmJsMain` | Web-App: Start, Speichern (IndexedDB), Teilen, Dateiauswahl; `resources/` mit index.html, Service Worker, Manifest |
 
 ```bash
 ./gradlew :composeApp:assembleDebug      # Android-APK (braucht Android-SDK)
 ./gradlew :composeApp:run                # Desktop-Version starten
 ./gradlew :composeApp:desktopTest        # Tests + Bildschirmfotos nach composeApp/build/bildschirmfotos
+./gradlew :composeApp:webApp             # Web-App nach composeApp/build/dist/wasmJs/productionExecutable
+./gradlew :composeApp:wasmJsBrowserDevelopmentRun   # Web-App lokal im Browser ausprobieren
 ```
 
-### Später: iOS
+### Einmalig: GitHub Pages einschalten
 
-Für iOS werden in `composeApp/build.gradle.kts` die Ziele `iosArm64()` und `iosSimulatorArm64()` ergänzt,
-eine kleine `iosMain` (Speichern, Teilen, Dateiauswahl – analog zu `MainActivity.kt`) und ein Xcode-Projekt.
-Dafür werden ein Mac und ein Apple-Developer-Account benötigt.
+Damit die Web-App veröffentlicht wird: *Settings → Pages → Build and deployment → Source: **GitHub Actions***.
+Danach baut jeder Push auf `main` die Web-App neu (Job „web“ im Workflow „APK bauen“).
