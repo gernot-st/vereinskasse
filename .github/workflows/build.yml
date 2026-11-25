@@ -61,14 +61,6 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.veroeffentlichen.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -89,6 +81,17 @@ jobs:
         with:
           path: composeApp/build/dist/wasmJs/productionExecutable
 
+  pages:
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.veroeffentlichen.outputs.page_url }}
+    steps:
       - name: Auf GitHub Pages veröffentlichen
         id: veroeffentlichen
         uses: actions/deploy-pages@v4
