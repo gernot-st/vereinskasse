@@ -294,6 +294,17 @@ class Bildschirmfotos {
     }
 
     @Test
+    fun umsaetzeLoeschen() {
+        val s = store(festDaten())
+        foto("24_vereine_umsaetze", 412, 1900) { App(s, plattform, null, {}, startSeiten = listOf(Seite.Kasse, Seite.Vereine), dunkel = false) }
+        foto("25_umsaetze_loeschen", 412, 892) {
+            VereinskasseTheme(dunkel = false) {
+                de.vereinskasse.ui.UmsaetzeLoeschenDialog(s.aktiverVerein!!, s.aktiveVeranstaltung!!, {}, {}, {})
+            }
+        }
+    }
+
+    @Test
     fun ersterStart() {
         foto("09_erster_start", 412, 892) { App(store(AppDaten()), plattform, null, {}) }
     }

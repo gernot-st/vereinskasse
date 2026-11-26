@@ -95,6 +95,10 @@ fun <T> List<T>.teilmengeVerschieben(gehoertDazu: (T) -> Boolean, von: Int, nach
 
 // ---------- Auswertung ----------
 
+/** Entfernt alle Umsätze einer Veranstaltung; die Veranstaltung selbst bleibt erhalten. */
+fun Veranstaltung.umsaetzeGeloescht(): Veranstaltung =
+    copy(bestellungen = emptyList(), fremdAbschluesse = emptyList(), istBestandCent = null, anfangsbestandCent = 0)
+
 fun Veranstaltung.letzteBestellung(): Bestellung? = bestellungen.maxByOrNull { it.zeit }
 
 fun Veranstaltung.abschlussBerechnen(abschlussId: String, geraet: String, vereinName: String, zeit: Long): Abschluss =

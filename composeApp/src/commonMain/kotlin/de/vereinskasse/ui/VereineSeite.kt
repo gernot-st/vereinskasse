@@ -41,6 +41,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.vereinskasse.logik.KassenStore
+import de.vereinskasse.logik.alsCsv
+import de.vereinskasse.logik.csvVorlage
+import de.vereinskasse.logik.umsaetzeGeloescht
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import de.vereinskasse.logik.Plattform
 import de.vereinskasse.logik.dateiname
 import de.vereinskasse.logik.konfigExport
@@ -50,6 +58,11 @@ import de.vereinskasse.logik.jetzt
 import de.vereinskasse.logik.sicherungExport
 import de.vereinskasse.logik.sicherungsDateiname
 import de.vereinskasse.model.Verein
+import de.vereinskasse.logik.geld
+import de.vereinskasse.logik.summeCent
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.font.FontWeight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +78,16 @@ fun VereineSeite(
     var umbenennen by remember { mutableStateOf<Verein?>(null) }
     var loeschen by remember { mutableStateOf<Verein?>(null) }
     var geraetename by remember { mutableStateOf(daten.geraetename) }
+    var umsaetzeLoeschen by remember { mutableStateOf(false) }
+
+    fun sicherungTeilen() {
+        val zeit = jetzt()
+        store.aendern { it.copy(letzteSicherung = zeit) }
+        val logos = store.daten.vereine.mapNotNull { v ->
+            v.logoId?.let { id -> store.logoBytes(id)?.let { id to it } }
+        }.toMap()
+        plattform.teileDatei(sicherungsDateiname(zeit), store.daten.sicherungExport(zeit, logos))
+    }
 
     Scaffold(
         topBar = {
@@ -110,6 +133,15 @@ fun VereineSeite(
                     onTeilen = {
                         plattform.teileDatei(dateiname(verein.name, "Konfiguration"), verein.konfigExport(store.logoBytes(verein.logoId)))
                     },
+                    onCsvExport = {
+                        plattform.teileDatei(dateiname(verein.name, "Artikel", "csv"), verein.alsCsv(), "text/csv")
+                    },
+                    onCsvImport = {
+                        // Ziel des CSV-Imports ist der aktive Verein
+                        store.aendern { it.copy(aktiverVereinId = verein.id) }
+                        plattform.dateiOeffnen()
+                    },
+                    onVorlage = { plattform.teileDatei("Vereinskasse_Vorlage.csv", csvVorlage(), "text/csv") },
                     onUmbenennen = { umbenennen = verein },
                     onLoeschen = { loeschen = verein },
                 )
@@ -140,7 +172,7 @@ fun VereineSeite(
                             else "• Importieren: Die Datei in WhatsApp antippen, über „Teilen“ in „Dateien“ sichern " +
                                 "und dann hier auf „Importieren“ tippen.\n") +
                             "• Gibt es den Verein schon, fragt die App, ob ersetzt oder ergänzt werden soll.\n" +
-                            "• Excel: Im Verein über das Menü oben rechts (drei Punkte): „Als CSV exportieren“ bzw. „CSV importieren“. " +
+                            "• Excel: Beim Verein unter „Teilen“ (oder in „Artikel & Co.“ im Menü oben rechts): „Als CSV exportieren“ bzw. „CSV importieren“. " +
                             "Spalten: Gruppe; Artikel; Preis; Pfand; Sichtbar; Farbe. „Importieren“ hier erkennt CSV-Dateien ebenfalls.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -173,19 +205,41 @@ fun VereineSeite(
                         Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Button(onClick = {
-                            val zeit = jetzt()
-                            store.aendern { it.copy(letzteSicherung = zeit) }
-                            val logos = store.daten.vereine.mapNotNull { v ->
-                                v.logoId?.let { id -> store.logoBytes(id)?.let { id to it } }
-                            }.toMap()
-                            plattform.teileDatei(sicherungsDateiname(zeit), store.daten.sicherungExport(zeit, logos))
-                        }, modifier = Modifier.weight(1f)) {
+                        Button(onClick = { sicherungTeilen() }, modifier = Modifier.weight(1f)) {
                             Text("Sicherung erstellen")
                         }
                         OutlinedButton(onClick = { plattform.dateiOeffnen() }, modifier = Modifier.weight(1f)) {
                             Text("Wiederherstellen")
                         }
+                    }
+                }
+            }
+            item {
+                Abschnitt("Alle Umsätze löschen") {
+                    val verein = store.aktiverVerein
+                    val veranstaltung = store.aktiveVeranstaltung
+                    Text(
+                        "Löscht Bestellungen, Stornos, importierte Abschlüsse und den gezählten Kassenstand der gerade " +
+                            "gewählten Veranstaltung und setzt den Anfangsbestand auf 0. Vereine, Artikel und die " +
+                            "Veranstaltung selbst bleiben erhalten – z. B. nach einem Probedurchlauf.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        if (verein != null && veranstaltung != null) "Gewählt: ${verein.name} – ${veranstaltung.name}"
+                        else "Keine Veranstaltung gewählt.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    OutlinedButton(
+                        onClick = { umsaetzeLoeschen = true },
+                        enabled = veranstaltung != null,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    ) {
+                        Icon(Icons.Default.Delete, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Alle Umsätze löschen")
                     }
                 }
             }
@@ -223,6 +277,21 @@ fun VereineSeite(
         }, onAbbrechen = { umbenennen = null })
     }
 
+    val zuLoeschenVerein = store.aktiverVerein
+    val zuLoeschen = store.aktiveVeranstaltung
+    if (umsaetzeLoeschen && zuLoeschenVerein != null && zuLoeschen != null) {
+        UmsaetzeLoeschenDialog(
+            verein = zuLoeschenVerein,
+            veranstaltung = zuLoeschen,
+            onSicherung = { sicherungTeilen() },
+            onLoeschen = {
+                store.veranstaltungAendern(zuLoeschenVerein.id, zuLoeschen.id) { it.umsaetzeGeloescht() }
+                umsaetzeLoeschen = false
+            },
+            onAbbrechen = { umsaetzeLoeschen = false },
+        )
+    }
+
     loeschen?.let { verein ->
         BestaetigenDialog(
             titel = "Verein löschen?",
@@ -252,6 +321,9 @@ private fun VereinKarte(
     onWaehlen: () -> Unit,
     onBearbeiten: () -> Unit,
     onTeilen: () -> Unit,
+    onCsvExport: () -> Unit,
+    onCsvImport: () -> Unit,
+    onVorlage: () -> Unit,
     onUmbenennen: () -> Unit,
     onLoeschen: () -> Unit,
 ) {
@@ -275,12 +347,68 @@ private fun VereinKarte(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedButton(onClick = onBearbeiten, modifier = Modifier.weight(1f)) { Text("Artikel & Co.") }
-            OutlinedButton(onClick = onTeilen, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.Share, null)
-                Spacer(Modifier.width(6.dp))
-                Text("Teilen")
+            Box(Modifier.weight(1f)) {
+                var menue by remember { mutableStateOf(false) }
+                OutlinedButton(onClick = { menue = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Share, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Teilen")
+                }
+                DropdownMenu(expanded = menue, onDismissRequest = { menue = false }) {
+                    DropdownMenuItem(text = { Text("Für andere Handys teilen") }, onClick = { menue = false; onTeilen() })
+                    HorizontalDivider()
+                    DropdownMenuItem(text = { Text("Als CSV exportieren (Excel)") }, onClick = { menue = false; onCsvExport() })
+                    DropdownMenuItem(text = { Text("CSV importieren") }, onClick = { menue = false; onCsvImport() })
+                    DropdownMenuItem(text = { Text("Leere CSV-Vorlage teilen") }, onClick = { menue = false; onVorlage() })
+                }
             }
         }
         Spacer(Modifier.height(0.dp))
     }
 }
+
+@Composable
+fun UmsaetzeLoeschenDialog(
+    verein: Verein,
+    veranstaltung: de.vereinskasse.model.Veranstaltung,
+    onSicherung: () -> Unit,
+    onLoeschen: () -> Unit,
+    onAbbrechen: () -> Unit,
+) {
+    val gueltig = veranstaltung.bestellungen.filter { !it.storniert }
+    val stornos = veranstaltung.bestellungen.size - gueltig.size
+    val einnahmen = gueltig.sumOf { b -> b.positionen.summeCent() }
+    AlertDialog(
+        onDismissRequest = onAbbrechen,
+        title = { Text("Alle Umsätze löschen?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Veranstaltung „${veranstaltung.name}“ (${verein.name}):", fontWeight = FontWeight.Bold)
+                Text(
+                    listOfNotNull(
+                        "• ${anzahl(gueltig.size, "Bestellung", "Bestellungen")}, ${geld(einnahmen)}",
+                        "• ${anzahl(stornos, "Storno", "Stornos")}",
+                        "• ${anzahl(veranstaltung.fremdAbschluesse.size, "importierter Abschluss", "importierte Abschlüsse")} anderer Kassen",
+                        veranstaltung.istBestandCent?.let { "• gezählter Kassenstand (${geld(it)})" },
+                        "• Anfangsbestand ${geld(veranstaltung.anfangsbestandCent)} wird auf 0 gesetzt",
+                    ).joinToString("\n"),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Willst du das wirklich? Die Umsätze können nicht wiederhergestellt werden.",
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Bold,
+                )
+                OutlinedButton(onClick = onSicherung, modifier = Modifier.fillMaxWidth()) {
+                    Text("Vorher Sicherung erstellen")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onLoeschen) { Text("Umsätze löschen", color = MaterialTheme.colorScheme.error) }
+        },
+        dismissButton = { TextButton(onClick = onAbbrechen) { Text("Abbrechen") } },
+    )
+}
+
+private fun anzahl(n: Int, einzahl: String, mehrzahl: String) = "$n ${if (n == 1) einzahl else mehrzahl}"

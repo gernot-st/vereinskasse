@@ -331,3 +331,17 @@ class DesignTest {
         assertTrue(logoAusBase64(sicherung.logos.getValue("alt"))!!.contentEquals(logo))
     }
 }
+
+class UmsaetzeLoeschenTest {
+    @Test
+    fun nurUmsaetzeWerdenGeloescht() {
+        val b = Bestellung("b", 1, listOf(Position(name = "Bier", menge = 1, einzelpreisCent = 350)))
+        val v = Veranstaltung(
+            "e1", "Sommerfest", 42, anfangsbestandCent = 15000, istBestandCent = 20000,
+            bestellungen = listOf(b, b.copy(id = "c", storniert = true)),
+            fremdAbschluesse = listOf(emptyList<Bestellung>().abschluss("f", "Kasse 2", "TSV", "Sommerfest", 0)),
+        )
+        val leer = v.umsaetzeGeloescht()
+        assertEquals(Veranstaltung("e1", "Sommerfest", 42), leer)
+    }
+}
